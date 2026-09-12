@@ -24,6 +24,8 @@ import { useVoiceCommands } from '../../hooks/useVoiceCommands';
 import { useDemoStore } from '../../demo/demoStore';
 import { DEMO_COUNTER_STRATEGY } from '../../demo/demoData';
 
+import { FoxCharacter3D } from '../3d/FoxCharacter3D';
+
 const ARENA_RADIUS = 6.2;
 const MOVEMENT_SPEED = 5.2;
 const ATTACK_RANGE = 2.2;
@@ -66,7 +68,7 @@ const HitSpark: React.FC<HitSparkProps> = ({ position, color }) => {
 };
 
 /**
- * 3D Player Fighter Component
+ * 3D Player Fighter Component (Fox McCloud)
  */
 interface PlayerFighterProps {
   position: React.MutableRefObject<THREE.Vector3>;
@@ -90,12 +92,13 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
   const groupRef = useRef<THREE.Group>(null);
   const keys = useKeyboardControls();
   const targetRotation = useRef(Math.PI / 2);
+  const [isMoving, setIsMoving] = useState(false);
+  const wasMoving = useRef(false);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
 
     if (isDead) {
-      // Death collapse
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -Math.PI / 2, delta * 6);
       groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0.25, delta * 6);
       return;
@@ -104,9 +107,14 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
     // 1. Movement Input
     const moveX = (keys.current.right ? 1 : 0) - (keys.current.left ? 1 : 0);
     const moveZ = (keys.current.backward ? 1 : 0) - (keys.current.forward ? 1 : 0);
-    const isMoving = (moveX !== 0 || moveZ !== 0) && !isBlocking;
+    const movingNow = (moveX !== 0 || moveZ !== 0) && !isBlocking;
 
-    if (isMoving && !isDodging) {
+    if (movingNow !== wasMoving.current) {
+      wasMoving.current = movingNow;
+      setIsMoving(movingNow);
+    }
+
+    if (movingNow && !isDodging) {
       const moveDir = new THREE.Vector2(moveX, moveZ).normalize();
       const speedMultiplier = isBlocking ? 0.3 : 1.0;
       const moveStep = MOVEMENT_SPEED * speedMultiplier * delta;
@@ -132,111 +140,39 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       delta * 12
     );
 
-    // 4. Combat Animations & Poses
+    // 4. Stance Elevation
     const t = state.clock.getElapsedTime();
-    if (isAttacking) {
-      groupRef.current.rotation.x = 0.35;
-      groupRef.current.scale.set(1.15, 0.95, 1.25);
-    } else if (isDodging) {
-      groupRef.current.rotation.x = 0.5;
-      groupRef.current.scale.set(0.9, 0.7, 0.9);
-      position.current.y = 0.05;
+    if (isDodging) {
+      position.current.y = 0.08;
     } else if (isBlocking) {
-      groupRef.current.rotation.x = -0.15;
-      groupRef.current.scale.set(1, 0.9, 1);
-      position.current.y = 0.15;
-    } else if (isMoving) {
-      position.current.y = 0.2 + Math.abs(Math.sin(t * 12)) * 0.08;
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.15, delta * 10);
-      groupRef.current.scale.set(1, 1, 1);
+      position.current.y = 0.16;
+    } else if (movingNow) {
+      position.current.y = 0.2 + Math.abs(Math.sin(t * 12)) * 0.05;
     } else {
-      position.current.y = 0.2 + Math.sin(t * 3) * 0.05;
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, delta * 10);
-      groupRef.current.scale.set(1, 1, 1);
+      position.current.y = 0.2 + Math.sin(t * 3) * 0.03;
     }
 
     groupRef.current.position.copy(position.current);
-    onPositionUpdate([position.current.x, position.current.y, position.current.z], isMoving);
+    onPositionUpdate([position.current.x, position.current.y, position.current.z], movingNow);
   });
 
   return (
     <group ref={groupRef} position={[-2.2, 0.2, 0]}>
-      {/* Defensive Energy Shield when Blocking */}
-      {isBlocking && (
-        <mesh position={[0, 0.9, 0.2]}>
-          <sphereGeometry args={[0.95, 24, 24]} />
-          <meshBasicMaterial color="#00f0ff" transparent opacity={0.3} wireframe />
-        </mesh>
-      )}
-
-      {/* Torso Capsule / Armor */}
-      <mesh position={[0, 0.9, 0]} castShadow>
-        <capsuleGeometry args={[0.3, 0.6, 8, 16]} />
-        <meshStandardMaterial
-          color={isHit ? '#ffffff' : '#e2e8f0'}
-          roughness={0.2}
-          metalness={0.8}
-        />
-      </mesh>
-
-      {/* Cyan Chest Plate */}
-      <mesh position={[0, 0.95, 0.2]}>
-        <boxGeometry args={[0.48, 0.45, 0.1]} />
-        <meshStandardMaterial color="#0284c7" roughness={0.15} metalness={0.9} />
-      </mesh>
-
-      {/* Core Reactor Glow */}
-      <mesh position={[0, 0.95, 0.26]}>
-        <sphereGeometry args={[0.08, 16, 16]} />
-        <meshBasicMaterial color={isHit ? '#ff3366' : '#00f0ff'} />
-      </mesh>
-
-      {/* Head */}
-      <mesh position={[0, 1.6, 0]}>
-        <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.85} />
-      </mesh>
-
-      {/* Cyan Visor */}
-      <mesh position={[0, 1.62, 0.18]}>
-        <boxGeometry args={[0.26, 0.08, 0.1]} />
-        <meshBasicMaterial color={isHit ? '#ffffff' : '#00f0ff'} />
-      </mesh>
-
-      {/* Left Fist / Attack Gauntlet */}
-      <mesh
-        position={[-0.38, isAttacking ? 1.15 : 0.9, isAttacking ? 0.65 : 0.2]}
-        scale={isAttacking ? [1.3, 1.3, 1.8] : [1, 1, 1]}
-      >
-        <boxGeometry args={[0.18, 0.35, 0.18]} />
-        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
-      </mesh>
-      <mesh position={[-0.38, isAttacking ? 1.15 : 0.72, isAttacking ? 0.8 : 0.24]}>
-        <boxGeometry args={[0.14, 0.14, 0.14]} />
-        <meshBasicMaterial color="#00f0ff" />
-      </mesh>
-
-      {/* Right Fist / Guard Gauntlet */}
-      <mesh position={[0.38, isBlocking ? 1.15 : 0.9, isBlocking ? 0.45 : 0.2]}>
-        <boxGeometry args={[0.18, 0.35, 0.18]} />
-        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
-      </mesh>
-      <mesh position={[0.38, isBlocking ? 1.15 : 0.72, isBlocking ? 0.55 : 0.24]}>
-        <boxGeometry args={[0.14, 0.14, 0.14]} />
-        <meshBasicMaterial color="#00f0ff" />
-      </mesh>
-
-      {/* Shadow */}
-      <mesh position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.65, 24]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.5} />
-      </mesh>
+      <FoxCharacter3D
+        variant="fox"
+        isAttacking={isAttacking}
+        isBlocking={isBlocking}
+        isDodging={isDodging}
+        isHit={isHit}
+        isDead={isDead}
+        isMoving={isMoving}
+      />
     </group>
   );
 };
 
 /**
- * 3D Enemy AI Fighter Component with Finite State Machine Updates
+ * 3D Enemy AI Fighter Component (Falco Lombardi / Rival) with Finite State Machine Updates
  */
 interface EnemyFighterProps {
   position: React.MutableRefObject<THREE.Vector3>;
@@ -268,19 +204,19 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
   isChallengeActive,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
+  const [isMoving, setIsMoving] = useState(false);
+  const wasMoving = useRef(false);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
 
     if (isDead) {
-      // Enemy death fall
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, Math.PI / 2, delta * 6);
       groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0.25, delta * 6);
       return;
     }
 
     // 1. Update AI Controller (Finite State Machine Decision & Movement Tick)
-    // When challenge is active, AI flanks left to box in the player's left side
     const targetPlayerPos = isChallengeActive
       ? [playerPosition[0] - 1.1, playerPosition[1], playerPosition[2]] as [number, number, number]
       : playerPosition;
@@ -305,6 +241,11 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
     );
 
     const aiState = aiControllerRef.current.getState();
+    const movingNow = aiState === 'APPROACH' || aiState === 'RETREAT';
+    if (movingNow !== wasMoving.current) {
+      wasMoving.current = movingNow;
+      setIsMoving(movingNow);
+    }
 
     // 2. Turn smoothly toward the player
     const angleToPlayer = Math.atan2(
@@ -318,22 +259,11 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
       delta * 5
     );
 
-    // 3. Pose & Animation based on AI FSM State
     const t = state.clock.getElapsedTime();
-    if (aiState === 'ATTACK') {
-      groupRef.current.rotation.x = 0.35;
-      groupRef.current.scale.set(1.2, 1, 1.25);
-    } else if (aiState === 'BLOCK') {
-      groupRef.current.rotation.x = -0.15;
-      groupRef.current.scale.set(1, 0.9, 1);
-    } else if (aiState === 'DODGE' || aiState === 'RETREAT') {
-      groupRef.current.rotation.x = -0.2;
-      groupRef.current.scale.set(0.95, 0.9, 0.95);
+    if (aiState === 'IDLE') {
+      position.current.y = 0.2 + Math.sin(t * 2.8 + 1.2) * 0.03;
     } else {
-      // Idle / Approach breathing
-      position.current.y = 0.2 + Math.sin(t * 2.8 + 1.2) * 0.05;
-      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, delta * 8);
-      groupRef.current.scale.set(1, 1, 1);
+      position.current.y = 0.2;
     }
 
     groupRef.current.position.copy(position.current);
@@ -341,75 +271,19 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
 
   const isBlocking = aiControllerRef.current.isBlocking();
   const isAttacking = aiControllerRef.current.isAttacking();
+  const isDodging = aiControllerRef.current.isDodging();
 
   return (
     <group ref={groupRef} position={[2.5, 0.2, 0]}>
-      {/* Enemy Defensive Shield when Blocking */}
-      {isBlocking && (
-        <mesh position={[0, 0.95, 0.2]}>
-          <sphereGeometry args={[0.95, 24, 24]} />
-          <meshBasicMaterial color="#ff0055" transparent opacity={0.3} wireframe />
-        </mesh>
-      )}
-
-      {/* Heavy Armor Torso */}
-      <mesh position={[0, 0.95, 0]} castShadow>
-        <boxGeometry args={[0.75, 0.8, 0.45]} />
-        <meshStandardMaterial
-          color={isHit ? '#ffffff' : '#dc2626'}
-          roughness={0.2}
-          metalness={0.8}
-        />
-      </mesh>
-
-      {/* Crimson Chest Reactor */}
-      <mesh position={[0, 1.0, 0.24]}>
-        <sphereGeometry args={[0.11, 16, 16]} />
-        <meshBasicMaterial color={isHit ? '#ffffff' : '#ff0055'} />
-      </mesh>
-
-      {/* Head */}
-      <mesh position={[0, 1.62, 0]}>
-        <sphereGeometry args={[0.24, 16, 16]} />
-        <meshStandardMaterial color="#991b1b" roughness={0.25} metalness={0.8} />
-      </mesh>
-
-      {/* Intimidating Crest / Horns */}
-      <mesh position={[-0.14, 1.84, 0]} rotation={[0, 0, -0.35]}>
-        <coneGeometry args={[0.06, 0.26, 8]} />
-        <meshStandardMaterial color="#ff0055" roughness={0.1} metalness={0.9} emissive="#ff0055" emissiveIntensity={0.5} />
-      </mesh>
-      <mesh position={[0.14, 1.84, 0]} rotation={[0, 0, 0.35]}>
-        <coneGeometry args={[0.06, 0.26, 8]} />
-        <meshStandardMaterial color="#ff0055" roughness={0.1} metalness={0.9} emissive="#ff0055" emissiveIntensity={0.5} />
-      </mesh>
-
-      {/* Crimson Visor Slit */}
-      <mesh position={[0, 1.64, 0.2]}>
-        <boxGeometry args={[0.28, 0.06, 0.1]} />
-        <meshBasicMaterial color="#ff0055" />
-      </mesh>
-
-      {/* Left Heavy Attack Fist */}
-      <mesh
-        position={[-0.42, isAttacking ? 1.15 : 0.9, isAttacking ? 0.65 : 0.22]}
-        scale={isAttacking ? [1.3, 1.3, 1.8] : [1, 1, 1]}
-      >
-        <boxGeometry args={[0.22, 0.42, 0.22]} />
-        <meshStandardMaterial color="#b91c1c" roughness={0.3} metalness={0.85} />
-      </mesh>
-
-      {/* Right Guard Fist */}
-      <mesh position={[0.42, isBlocking ? 1.15 : 0.9, isBlocking ? 0.45 : 0.22]}>
-        <boxGeometry args={[0.22, 0.42, 0.22]} />
-        <meshStandardMaterial color="#b91c1c" roughness={0.3} metalness={0.85} />
-      </mesh>
-
-      {/* Shadow */}
-      <mesh position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.7, 24]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.6} />
-      </mesh>
+      <FoxCharacter3D
+        variant="falco"
+        isAttacking={isAttacking}
+        isBlocking={isBlocking}
+        isDodging={isDodging}
+        isHit={isHit}
+        isDead={isDead}
+        isMoving={isMoving}
+      />
     </group>
   );
 };

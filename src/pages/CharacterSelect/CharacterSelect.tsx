@@ -42,19 +42,19 @@ export interface FightingStyle {
 const FIGHTING_STYLES: FightingStyle[] = [
   {
     id: 'melee',
-    name: 'MELEE',
-    archetype: 'CYBER BRAWLER',
+    name: 'FOX McCLOUD',
+    archetype: 'STAR FOX ACE // MELEE',
     difficulty: 3,
-    difficultyLabel: 'NORMAL ★★★☆☆',
+    difficultyLabel: 'APEX AGILITY ★★★☆☆',
     isPlayable: true,
     accentColor: '#00f0ff',
     icon: <Zap size={22} />,
-    tagline: 'High-impact kinetic punches, dodges, and parries',
+    tagline: 'High-speed frame-1 Reflector Shine, illusion dashes, and rapid strikes',
     description:
-      'Balanced close-quarters combatant. Uses hydraulic fists and evasive slips. Perfectly suited to feed high-frequency pattern data into the AI Fighting DNA engine.',
+      'The legendary Star Fox ace fighter pilot from Super Smash Bros. Melee. Equipped with bionic metal combat boots, tactical comms headset, white flight jacket, and the iconic hexagonal Reflector shield.',
     stats: {
-      power: 85,
-      speed: 90,
+      power: 88,
+      speed: 98,
       defense: 75,
       adaptability: 96,
     },

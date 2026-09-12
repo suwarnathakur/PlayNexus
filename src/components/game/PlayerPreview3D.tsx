@@ -1,111 +1,28 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { FoxCharacter3D } from '../3d/FoxCharacter3D';
 
 interface PlayerPreviewModelProps {
   glowColor?: string;
   isMelee?: boolean;
 }
 
-const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = ({
-  glowColor = '#00f0ff',
-  isMelee = true,
-}) => {
+const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = () => {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
     if (groupRef.current) {
       const t = state.clock.getElapsedTime();
-      // Gentle floating/breathing animation
-      groupRef.current.position.y = 0.15 + Math.sin(t * 2.6) * 0.05;
-      // Gentle auto-rotation
-      groupRef.current.rotation.y = Math.sin(t * 0.7) * 0.35;
+      // Gentle floating and smooth rotation showcasing Fox McCloud from all angles
+      groupRef.current.position.y = 0.12 + Math.sin(t * 2.4) * 0.03;
+      groupRef.current.rotation.y = Math.sin(t * 0.6) * 0.45;
     }
   });
 
   return (
-    <group ref={groupRef} position={[0, 0.15, 0]}>
-      {/* Head */}
-      <mesh position={[0, 1.72, 0]}>
-        <sphereGeometry args={[0.24, 20, 20]} />
-        <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.85} />
-      </mesh>
-
-      {/* Cyber Visor Glow */}
-      <mesh position={[0, 1.74, 0.2]}>
-        <boxGeometry args={[0.3, 0.09, 0.1]} />
-        <meshBasicMaterial color={glowColor} />
-      </mesh>
-
-      {/* Neck */}
-      <mesh position={[0, 1.46, 0]}>
-        <cylinderGeometry args={[0.1, 0.12, 0.14, 16]} />
-        <meshStandardMaterial color="#94a3b8" metalness={0.8} />
-      </mesh>
-
-      {/* Chest Armor Plate */}
-      <mesh position={[0, 1.1, 0]} castShadow>
-        <boxGeometry args={[0.7, 0.68, 0.4]} />
-        <meshStandardMaterial color="#e2e8f0" roughness={0.2} metalness={0.85} />
-      </mesh>
-
-      {/* Chest Accent Plates */}
-      <mesh position={[0, 1.12, 0.21]}>
-        <boxGeometry args={[0.45, 0.42, 0.06]} />
-        <meshStandardMaterial color="#0284c7" roughness={0.15} metalness={0.9} />
-      </mesh>
-
-      {/* Chest Reactor Light */}
-      <mesh position={[0, 1.15, 0.25]}>
-        <sphereGeometry args={[0.1, 16, 16]} />
-        <meshBasicMaterial color={glowColor} />
-      </mesh>
-
-      {/* Belt / Pelvis */}
-      <mesh position={[0, 0.66, 0]}>
-        <cylinderGeometry args={[0.24, 0.28, 0.32, 16]} />
-        <meshStandardMaterial color="#64748b" roughness={0.3} metalness={0.8} />
-      </mesh>
-
-      {/* Left Guard Arm & Fist */}
-      <mesh position={[-0.38, 1.05, 0.2]} rotation={[0.4, 0.3, -0.2]}>
-        <boxGeometry args={[0.18, 0.46, 0.18]} />
-        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
-      </mesh>
-      {/* Left Glowing Combat Knuckle */}
-      <mesh position={[-0.42, 1.25, 0.4]}>
-        <boxGeometry args={[0.14, 0.14, 0.14]} />
-        <meshStandardMaterial color={isMelee ? glowColor : '#38bdf8'} roughness={0.1} metalness={0.9} />
-      </mesh>
-
-      {/* Right Guard Arm & Fist */}
-      <mesh position={[0.38, 1.05, 0.2]} rotation={[0.4, -0.3, 0.2]}>
-        <boxGeometry args={[0.18, 0.46, 0.18]} />
-        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
-      </mesh>
-      {/* Right Glowing Combat Knuckle */}
-      <mesh position={[0.42, 1.25, 0.4]}>
-        <boxGeometry args={[0.14, 0.14, 0.14]} />
-        <meshStandardMaterial color={isMelee ? glowColor : '#38bdf8'} roughness={0.1} metalness={0.9} />
-      </mesh>
-
-      {/* Left Leg */}
-      <mesh position={[-0.18, 0.3, 0]}>
-        <boxGeometry args={[0.22, 0.65, 0.22]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.3} metalness={0.8} />
-      </mesh>
-
-      {/* Right Leg */}
-      <mesh position={[0.18, 0.3, 0]}>
-        <boxGeometry args={[0.22, 0.65, 0.22]} />
-        <meshStandardMaterial color="#94a3b8" roughness={0.3} metalness={0.8} />
-      </mesh>
-
-      {/* Ground Shadow */}
-      <mesh position={[0, -0.13, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.7, 32]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.6} />
-      </mesh>
+    <group ref={groupRef} position={[0, 0.12, 0]}>
+      <FoxCharacter3D variant="fox" />
     </group>
   );
 };

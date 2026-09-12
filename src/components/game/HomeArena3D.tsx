@@ -5,21 +5,21 @@ import * as THREE from 'three';
 import { ArenaCenterpiece } from '../3d/ArenaCenterpiece';
 import { ArenaStadium } from '../3d/ArenaStadium';
 
+import { FoxCharacter3D } from '../3d/FoxCharacter3D';
+
 interface FighterSilhouetteProps {
   position: [number, number, number];
   isAi?: boolean;
-  glowColor: string;
-  baseColor: string;
+  glowColor?: string;
+  baseColor?: string;
 }
 
 /**
- * Humanoid fighter silhouette using simple geometric primitives
+ * 3D Fox McCloud vs Falco Lombardi showcase fighters in the background Colosseum
  */
 const FighterSilhouette: React.FC<FighterSilhouetteProps> = ({
   position,
   isAi = false,
-  glowColor,
-  baseColor,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -27,83 +27,15 @@ const FighterSilhouette: React.FC<FighterSilhouetteProps> = ({
     if (groupRef.current) {
       const t = state.clock.getElapsedTime();
       // Subtle combat idle stance sway and breathing
-      groupRef.current.position.y = position[1] + Math.sin(t * 2.8 + (isAi ? 1.4 : 0)) * 0.06;
-      groupRef.current.rotation.z = Math.sin(t * 1.4 + (isAi ? 0.8 : 0)) * 0.02;
+      groupRef.current.position.y = position[1] + Math.sin(t * 2.8 + (isAi ? 1.4 : 0)) * 0.04;
+      groupRef.current.rotation.y =
+        (isAi ? -Math.PI / 2 : Math.PI / 2) + Math.sin(t * 1.4 + (isAi ? 0.8 : 0)) * 0.08;
     }
   });
 
   return (
-    <group ref={groupRef} position={position}>
-      {/* Head */}
-      <mesh position={[0, 1.7, 0]}>
-        <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial color={baseColor} roughness={0.5} metalness={0.8} />
-      </mesh>
-
-      {/* Visor Eye Glow */}
-      <mesh position={[isAi ? -0.16 : 0.16, 1.72, 0]}>
-        <boxGeometry args={[0.08, 0.08, 0.24]} />
-        <meshBasicMaterial color={glowColor} />
-      </mesh>
-
-      {/* Neck */}
-      <mesh position={[0, 1.48, 0]}>
-        <cylinderGeometry args={[0.09, 0.11, 0.14, 12]} />
-        <meshStandardMaterial color={isAi ? '#991b1b' : '#94a3b8'} roughness={0.3} metalness={0.8} />
-      </mesh>
-
-      {/* Chest & Torso */}
-      <mesh position={[0, 1.12, 0]} castShadow>
-        <boxGeometry args={[0.65, 0.65, 0.38]} />
-        <meshStandardMaterial color={baseColor} roughness={0.25} metalness={0.85} />
-      </mesh>
-
-      {/* Glowing Core Reactor */}
-      <mesh position={[isAi ? -0.34 : 0.34, 1.18, 0]}>
-        <sphereGeometry args={[0.08, 16, 16]} />
-        <meshBasicMaterial color={glowColor} />
-      </mesh>
-
-      {/* Abdomen / Waist */}
-      <mesh position={[0, 0.68, 0]}>
-        <cylinderGeometry args={[0.22, 0.26, 0.32, 16]} />
-        <meshStandardMaterial color={isAi ? '#7f1d1d' : '#64748b'} roughness={0.4} metalness={0.75} />
-      </mesh>
-
-      {/* Left Guard Arm (Forward Fist) */}
-      <mesh position={[isAi ? -0.28 : 0.28, 1.1, isAi ? -0.25 : 0.25]} rotation={[0.4, isAi ? -0.5 : 0.5, 0]}>
-        <boxGeometry args={[0.18, 0.45, 0.18]} />
-        <meshStandardMaterial color={isAi ? '#b91c1c' : '#0ea5e9'} roughness={0.3} metalness={0.85} />
-      </mesh>
-      {/* Left Forearm / Fist */}
-      <mesh position={[isAi ? -0.42 : 0.42, 1.28, isAi ? -0.15 : 0.15]}>
-        <boxGeometry args={[0.16, 0.16, 0.16]} />
-        <meshStandardMaterial color={glowColor} roughness={0.1} metalness={0.9} />
-      </mesh>
-
-      {/* Right Guard Arm */}
-      <mesh position={[0, 1.05, isAi ? 0.32 : -0.32]}>
-        <boxGeometry args={[0.18, 0.48, 0.18]} />
-        <meshStandardMaterial color={isAi ? '#b91c1c' : '#0ea5e9'} roughness={0.3} metalness={0.85} />
-      </mesh>
-
-      {/* Left Leg */}
-      <mesh position={[isAi ? 0.14 : -0.14, 0.32, 0.14]}>
-        <boxGeometry args={[0.2, 0.64, 0.2]} />
-        <meshStandardMaterial color={isAi ? '#991b1b' : '#94a3b8'} roughness={0.3} metalness={0.8} />
-      </mesh>
-
-      {/* Right Leg */}
-      <mesh position={[isAi ? -0.18 : 0.18, 0.32, -0.14]}>
-        <boxGeometry args={[0.2, 0.64, 0.2]} />
-        <meshStandardMaterial color={isAi ? '#991b1b' : '#94a3b8'} roughness={0.3} metalness={0.8} />
-      </mesh>
-
-      {/* Ground Shadow Disc */}
-      <mesh position={[0, -position[1] + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.65, 32]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.5} />
-      </mesh>
+    <group ref={groupRef} position={position} rotation={[0, isAi ? -Math.PI / 2 : Math.PI / 2, 0]}>
+      <FoxCharacter3D variant={isAi ? 'falco' : 'fox'} />
     </group>
   );
 };

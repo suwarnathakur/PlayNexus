@@ -10,7 +10,7 @@ export const Arena: React.FC = () => {
   return (
     <CombatArena
       onExit={() => navigate('/')}
-      playerCodename={player?.codename || 'OPERATIVE'}
+      playerCodename={player?.codename || 'FOX McCLOUD'}
     />
   );
 };
