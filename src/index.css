@@ -1,0 +1,310 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   PLAYNEXUS — ANIME CYBERPUNK ROOFTOP CITY DESIGN SYSTEM
+   High aesthetic, vibrant, animated neon atmosphere (Dark & Lite)
+   ========================================================================== */
+
+:root {
+  /* Typography */
+  --font-game: 'Fredoka', cursive, -apple-system, sans-serif;
+  --font-heading: 'Outfit', -apple-system, sans-serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Cyberpunk Color Palette (from reference image) */
+  --neon-pink: #ff007f;
+  --neon-pink-glow: rgba(255, 0, 127, 0.55);
+  --neon-cyan: #00f0ff;
+  --neon-cyan-glow: rgba(0, 240, 255, 0.55);
+  --neon-purple: #9d4edd;
+  --neon-gold: #fbbf24;
+
+  --border-radius-sm: 10px;
+  --border-radius-md: 16px;
+  --border-radius-lg: 26px;
+  --border-radius-pill: 9999px;
+
+  /* Default Dark Theme: "Neon Night Rooftop" */
+  --bg-void: #050811;
+  --bg-primary: #070b16;
+  --bg-card: rgba(8, 14, 28, 0.78);
+  --bg-card-hover: rgba(12, 20, 38, 0.88);
+  --bg-input: rgba(5, 9, 18, 0.82);
+
+  --text-main: #ffffff;
+  --text-sub: #94a3b8;
+  --text-muted: #64748b;
+
+  --border-card: rgba(0, 240, 255, 0.35);
+  --border-active: #ff007f;
+
+  --card-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(0, 240, 255, 0.15);
+}
+
+/* ================= LITE THEME: "SUNRISE MEGAPOLIS" ================= */
+[data-theme="lite"] {
+  --neon-pink: #e11d48;
+  --neon-pink-glow: rgba(225, 29, 72, 0.4);
+  --neon-cyan: #0066ff;
+  --neon-cyan-glow: rgba(0, 102, 255, 0.4);
+  --neon-purple: #7c3aed;
+  --neon-gold: #d97706;
+
+  --bg-void: #edf4fe;
+  --bg-primary: #f5f9ff;
+  --bg-card: rgba(255, 255, 255, 0.88);
+  --bg-card-hover: #ffffff;
+  --bg-input: rgba(240, 246, 255, 0.92);
+
+  --text-main: #0a1020;
+  --text-sub: #334155;
+  --text-muted: #64748b;
+
+  --border-card: rgba(0, 102, 255, 0.3);
+  --border-active: #0066ff;
+
+  --card-shadow: 0 25px 50px rgba(0, 40, 100, 0.12), 0 0 30px rgba(0, 102, 255, 0.18);
+}
+
+/* Global Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  background-color: var(--bg-void);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  transition: background-color 0.4s ease, color 0.4s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ================= ANIMATIONS ================= */
+
+@keyframes pulseGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px var(--neon-cyan-glow));
+  }
+  50% {
+    filter: drop-shadow(0 0 25px var(--neon-pink-glow));
+  }
+}
+
+@keyframes energyBorderSweep {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes beamLaser {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes shakeAlert {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
+/* Cyber Card Glassmorphism - Gaming Platform Edition */
+.cyber-card {
+  position: relative;
+  background: var(--bg-card);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1.5px solid var(--border-card);
+  border-radius: 18px;
+  box-shadow: var(--card-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+/* Sci-Fi Chamfered Gaming Card */
+.game-chassis-card {
+  position: relative;
+  background: var(--bg-card);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Corner Technical Markings */
+.game-chassis-card::before {
+  content: '+';
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--neon-cyan);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.game-chassis-card::after {
+  content: '+';
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--neon-pink);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* High-Impact Chamfered Gaming Action Button */
+.game-launch-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 28px;
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ff007f 0%, #7928ca 50%, #00f0ff 100%);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(255, 0, 127, 0.4), 0 0 20px rgba(0, 240, 255, 0.25);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.game-launch-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-25deg);
+  animation: launchShimmer 3.5s infinite;
+}
+
+@keyframes launchShimmer {
+  0%, 70% { left: -100%; }
+  100% { left: 200%; }
+}
+
+.game-launch-btn:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 40px rgba(255, 0, 127, 0.6), 0 0 30px rgba(0, 240, 255, 0.4);
+}
+
+.game-launch-btn:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+/* Gamer Nav Link Tabs */
+.launcher-tab {
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-sub);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.launcher-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.launcher-tab.active {
+  color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+/* Window Control Buttons */
+.win-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.win-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-main);
+}
+
+.win-btn.close:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+/* Quick Platform Sign-in Buttons */
+.platform-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.platform-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--neon-cyan);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 240, 255, 0.2);
+}
