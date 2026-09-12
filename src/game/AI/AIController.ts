@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { AIStateType, AICombatContext } from './AIState';
 import { AIStrategy } from './AIStrategy';
+import { AdaptiveAI } from '../../ai/adaptive/AdaptiveAI';
 
 export interface AIControllerCallbacks {
   onAttackTrigger: () => void;
@@ -21,9 +22,19 @@ export class AIController {
   private dodgeSpeed: number = 5.0;
 
   private callbacks: AIControllerCallbacks;
+  private adaptiveAI?: AdaptiveAI;
 
-  constructor(callbacks: AIControllerCallbacks) {
+  constructor(callbacks: AIControllerCallbacks, adaptiveAI?: AdaptiveAI) {
     this.callbacks = callbacks;
+    this.adaptiveAI = adaptiveAI;
+  }
+
+  public setAdaptiveAI(adaptive: AdaptiveAI): void {
+    this.adaptiveAI = adaptive;
+  }
+
+  public getAdaptiveAI(): AdaptiveAI | undefined {
+    return this.adaptiveAI;
   }
 
   public getState(): AIStateType {
@@ -62,7 +73,8 @@ export class AIController {
     delta: number,
     enemyPos: THREE.Vector3,
     playerPos: THREE.Vector3,
-    ctx: Omit<AICombatContext, 'distanceToPlayer' | 'playerPos' | 'enemyPos'>
+    ctx: Omit<AICombatContext, 'distanceToPlayer' | 'playerPos' | 'enemyPos'>,
+    extra?: { isPlayerDodging?: boolean; playerComboCount?: number }
   ): void {
     const distanceToPlayer = enemyPos.distanceTo(playerPos);
 
@@ -79,13 +91,18 @@ export class AIController {
     // Handle Active State Behaviors
     switch (this.currentState) {
       case 'APPROACH': {
-        // Move towards player
-        const dir = new THREE.Vector3().subVectors(playerPos, enemyPos);
-        dir.y = 0;
-        if (dir.length() > 0.1) {
+        // Move towards player (with adaptive intercept bias if countering dodge)
+        const dir = this.adaptiveAI
+          ? this.adaptiveAI.calculateInterceptVector(enemyPos, playerPos)
+          : new THREE.Vector3().subVectors(playerPos, enemyPos).setY(0);
+
+        if (dir.length() > 0.05) {
           dir.normalize();
-          enemyPos.x += dir.x * this.approachSpeed * delta;
-          enemyPos.z += dir.z * this.approachSpeed * delta;
+          const effectiveSpeed = this.adaptiveAI
+            ? this.adaptiveAI.getApproachSpeed(this.approachSpeed)
+            : this.approachSpeed;
+          enemyPos.x += dir.x * effectiveSpeed * delta;
+          enemyPos.z += dir.z * effectiveSpeed * delta;
         }
         break;
       }
@@ -122,7 +139,21 @@ export class AIController {
         break;
       }
 
-      case 'BLOCK':
+      case 'BLOCK': {
+        // Adaptive Counter-Attack after Block:
+        // If AI held block and timer is near end, check for immediate parry-strike
+        if (
+          this.adaptiveAI &&
+          this.stateTimeRemaining <= 0.25 &&
+          distanceToPlayer <= 2.3 &&
+          this.adaptiveAI.shouldCounterAfterBlock()
+        ) {
+          this.transitionTo('ATTACK');
+          return;
+        }
+        break;
+      }
+
       case 'IDLE':
       default:
         // Hold position / defensive stance
@@ -137,9 +168,11 @@ export class AIController {
       enemyPos.z = Math.sin(angle) * ctx.arenaRadius;
     }
 
-    // State Transition Check: When timer expires, evaluate next state via AIStrategy
+    // State Transition Check: When timer expires, evaluate next state via AdaptiveAI or base AIStrategy
     if (this.stateTimeRemaining <= 0) {
-      const nextState = AIStrategy.decideNextState(fullCtx, this.currentState);
+      const nextState = this.adaptiveAI
+        ? this.adaptiveAI.decideNextState(fullCtx, this.currentState, extra)
+        : AIStrategy.decideNextState(fullCtx, this.currentState);
       this.transitionTo(nextState);
     }
   }

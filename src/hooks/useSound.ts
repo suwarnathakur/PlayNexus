@@ -9,10 +9,20 @@ export type SoundType =
   | 'granted'
   | 'denied'
   | 'pulse'
-  | 'typing';
+  | 'typing'
+  | 'transition'
+  | 'attack'
+  | 'dodge'
+  | 'victory'
+  | 'defeat';
 
-// Global audio state shared across components
+// Global audio state shared across components, persisted in localStorage
 let globalAudioMuted = false;
+try {
+  globalAudioMuted = localStorage.getItem('playnexus_audio_muted') === 'true';
+} catch {
+  // Ignored
+}
 
 export const useSound = () => {
   const [isMuted, setIsMuted] = useState<boolean>(globalAudioMuted);
@@ -37,6 +47,11 @@ export const useSound = () => {
     setIsMuted(prev => {
       const next = !prev;
       globalAudioMuted = next;
+      try {
+        localStorage.setItem('playnexus_audio_muted', String(next));
+      } catch {
+        // Ignored
+      }
       return next;
     });
   }, []);
@@ -184,6 +199,91 @@ export const useSound = () => {
           gain.connect(ctx.destination);
           osc.start(now);
           osc.stop(now + 0.02);
+          break;
+        }
+
+        case 'transition': {
+          // Subtle cyber whoosh / screen sweep
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(840, now + 0.06);
+          osc.frequency.exponentialRampToValueAtTime(220, now + 0.14);
+          gain.gain.setValueAtTime(0.04, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.14);
+          break;
+        }
+
+        case 'attack': {
+          // Kinetic punch impact drop
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(65, now + 0.08);
+          gain.gain.setValueAtTime(0.09, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.08);
+          break;
+        }
+
+        case 'dodge': {
+          // Fast airy swoosh
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.linearRampToValueAtTime(1100, now + 0.05);
+          osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+          gain.gain.setValueAtTime(0.045, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.1);
+          break;
+        }
+
+        case 'victory': {
+          // Cyber fanfare arpeggio: C5 - E5 - G5 - C6
+          const freqs = [523.25, 659.25, 783.99, 1046.5];
+          freqs.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+            gain.gain.setValueAtTime(0, now + idx * 0.07);
+            gain.gain.linearRampToValueAtTime(0.08, now + idx * 0.07 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.07 + 0.5);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.07);
+            osc.stop(now + idx * 0.07 + 0.5);
+          });
+          break;
+        }
+
+        case 'defeat': {
+          // Descending drone power-down
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(260, now);
+          osc.frequency.exponentialRampToValueAtTime(75, now + 0.45);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.45);
           break;
         }
       }

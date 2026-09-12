@@ -1,5 +1,17 @@
 import React from 'react';
-import { ArrowLeft, Activity, Swords, Zap, RotateCcw, Award, Dna } from 'lucide-react';
+import {
+  ArrowLeft,
+  Activity,
+  Swords,
+  Zap,
+  RotateCcw,
+  Award,
+  Dna,
+  Mic,
+  MicOff,
+  Volume2,
+  Sparkles,
+} from 'lucide-react';
 import { GlowButton } from '../common/GlowButton';
 import { HealthBar } from './HealthBar';
 
@@ -19,6 +31,19 @@ interface CombatHUDProps {
   isVictory: boolean;
   isDefeat: boolean;
 
+  equippedWeapon?: {
+    weapon: string;
+    type: string;
+    bonus: string;
+    detectedItem?: string;
+  } | null;
+
+  isVoiceListening?: boolean;
+  lastVoiceCommand?: string | null;
+  isVoiceSupported?: boolean;
+  voiceError?: string | null;
+  onToggleVoice?: () => void;
+
   onExit: () => void;
   onRestartMatch: () => void;
   onNavigateAnalysis?: () => void;
@@ -26,6 +51,7 @@ interface CombatHUDProps {
   onAttackPress?: () => void;
   onBlockPress?: () => void;
   onDodgePress?: () => void;
+  onSpecialPress?: () => void;
 }
 
 export const CombatHUD: React.FC<CombatHUDProps> = ({
@@ -40,12 +66,19 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
   lastDamageEvent,
   isVictory,
   isDefeat,
+  equippedWeapon,
+  isVoiceListening = false,
+  lastVoiceCommand = null,
+  isVoiceSupported = true,
+  voiceError = null,
+  onToggleVoice,
   onExit,
   onRestartMatch,
   onNavigateAnalysis,
   onAttackPress,
   onBlockPress,
   onDodgePress,
+  onSpecialPress,
 }) => {
   return (
     <div
@@ -62,13 +95,95 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
     >
       {/* ================= TOP ROW: HEADER, HEALTH BARS & COMBO COUNTER ================= */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
-        {/* Navigation & Telemetry Badges */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ pointerEvents: 'auto' }}>
+        {/* Navigation, Telemetry & Voice Indicator */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+          <div style={{ pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: '14px' }}>
             <GlowButton variant="secondary" onClick={onExit}>
               <ArrowLeft size={16} />
               <span>EXIT ARENA</span>
             </GlowButton>
+
+            {/* Microphone State Indicator & Last Recognized Command */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                id="voice-mic-indicator"
+                onClick={onToggleVoice}
+                title={
+                  !isVoiceSupported
+                    ? 'Web Speech API is not supported in this browser'
+                    : isVoiceListening
+                    ? 'Microphone active. Say "Attack", "Block", "Dodge", "Special". Click to mute.'
+                    : 'Click to activate voice commands'
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 14px',
+                  background: !isVoiceSupported
+                    ? 'rgba(255, 170, 0, 0.12)'
+                    : isVoiceListening
+                    ? 'rgba(0, 255, 157, 0.15)'
+                    : 'rgba(255, 255, 255, 0.06)',
+                  border: !isVoiceSupported
+                    ? '1px solid rgba(255, 170, 0, 0.5)'
+                    : isVoiceListening
+                    ? '1.5px solid rgba(0, 255, 157, 0.6)'
+                    : '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '20px',
+                  fontFamily: 'var(--font-mono, monospace)',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  color: !isVoiceSupported ? '#ffaa00' : isVoiceListening ? '#00ff9d' : '#94a3b8',
+                  cursor: 'pointer',
+                  boxShadow: isVoiceListening ? '0 0 16px rgba(0, 255, 157, 0.35)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {isVoiceListening ? (
+                  <>
+                    <Mic size={14} color="#00ff9d" className="animate-pulse" />
+                    <span>MIC ● LISTENING</span>
+                  </>
+                ) : !isVoiceSupported ? (
+                  <>
+                    <MicOff size={14} color="#ffaa00" />
+                    <span>MIC ⚠️ UNSUPPORTED</span>
+                  </>
+                ) : (
+                  <>
+                    <MicOff size={14} color="#94a3b8" />
+                    <span>MIC ○ MUTED</span>
+                  </>
+                )}
+              </button>
+
+              {/* Recognized Command Live Badge */}
+              {lastVoiceCommand && (
+                <div
+                  id="voice-command-recognized-badge"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '5px 12px',
+                    background: 'rgba(0, 240, 255, 0.18)',
+                    border: '1.5px solid #00f0ff',
+                    borderRadius: '16px',
+                    fontFamily: 'var(--font-hud, monospace)',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    color: '#00f0ff',
+                    boxShadow: '0 0 20px rgba(0, 240, 255, 0.4)',
+                    animation: 'pulse 1s infinite alternate',
+                  }}
+                >
+                  <Volume2 size={13} />
+                  <span>VOICE: "{lastVoiceCommand}"</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div
@@ -78,16 +193,22 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
               gap: '10px',
               padding: '6px 16px',
               background: 'rgba(5, 7, 15, 0.85)',
-              border: '1px solid rgba(0, 240, 255, 0.3)',
+              border: '1px solid rgba(0, 240, 255, 0.25)',
               borderRadius: '20px',
-              fontFamily: 'var(--font-mono, monospace)',
-              fontSize: '0.74rem',
-              color: 'var(--accent-cyan, #00f0ff)',
-              backdropFilter: 'blur(10px)',
+              backdropFilter: 'blur(12px)',
             }}
           >
-            <Activity size={14} className="animate-pulse" />
-            <span>COMBAT SIMULATION // MELEE ENGAGED</span>
+            <Activity size={14} color="#00f0ff" className="animate-pulse" />
+            <span
+              style={{
+                fontFamily: 'var(--font-mono, monospace)',
+                fontSize: '0.75rem',
+                color: 'var(--text-secondary, #94a3b8)',
+                letterSpacing: '0.08em',
+              }}
+            >
+              VOICE & SENSOR SYNC // ARENA COMBAT
+            </span>
           </div>
 
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text-muted, #94a3b8)' }}>
@@ -107,15 +228,39 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
             width: '100%',
           }}
         >
-          {/* PLAYER HP */}
-          <HealthBar
-            label={`PLAYER: ${playerCodename}`}
-            currentHp={playerHp}
-            maxHp={playerMaxHp}
-            colorGradient="linear-gradient(90deg, #00f0ff, #0077ff)"
-            glowColor="#00f0ff"
-            statusBadge={playerState !== 'NORMAL' ? playerState : undefined}
-          />
+          {/* PLAYER HP & EQUIPPED WEAPON */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <HealthBar
+              label={`PLAYER: ${playerCodename}`}
+              currentHp={playerHp}
+              maxHp={playerMaxHp}
+              colorGradient="linear-gradient(90deg, #00f0ff, #0077ff)"
+              glowColor="#00f0ff"
+              statusBadge={playerState !== 'NORMAL' ? playerState : undefined}
+            />
+            {equippedWeapon && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontFamily: 'var(--font-mono, monospace)',
+                  fontSize: '0.68rem',
+                  color: '#00ff9d',
+                  background: 'rgba(0, 255, 157, 0.08)',
+                  border: '1px solid rgba(0, 255, 157, 0.3)',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  alignSelf: 'flex-start',
+                }}
+              >
+                <Zap size={11} color="#00ff9d" />
+                <span>
+                  WEAPON: {equippedWeapon.weapon} ({equippedWeapon.type}) // {equippedWeapon.bonus}
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* Center VS Indicator */}
           <div
@@ -335,6 +480,50 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
               </span>
               <span>DODGE</span>
             </button>
+
+            {/* Special Ability Button / Indicator */}
+            <button
+              type="button"
+              id="combat-special-btn"
+              onClick={onSpecialPress}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                background: 'rgba(255, 170, 0, 0.14)',
+                border: '1px solid #ffaa00',
+                borderRadius: '8px',
+                color: '#ffaa00',
+                fontFamily: 'var(--font-display)',
+                fontSize: '0.76rem',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ background: '#ffaa00', color: '#000', padding: '1px 5px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
+                U
+              </span>
+              <span>SPECIAL</span>
+            </button>
+
+            {/* Voice Input Prompt */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.68rem',
+                color: 'var(--text-secondary, #94a3b8)',
+                borderLeft: '1px solid rgba(255, 255, 255, 0.15)',
+                paddingLeft: '14px',
+              }}
+            >
+              <Mic size={13} color="#00ff9d" />
+              <span>VOICE: "ATTACK" | "BLOCK" | "DODGE" | "SPECIAL"</span>
+            </div>
           </div>
         </div>
       </div>

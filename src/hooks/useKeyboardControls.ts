@@ -8,6 +8,7 @@ export interface CombatKeys {
   attack: boolean;
   block: boolean;
   dodge: boolean;
+  special: boolean;
 }
 
 export function useKeyboardControls() {
@@ -19,6 +20,7 @@ export function useKeyboardControls() {
     attack: false,
     block: false,
     dodge: false,
+    special: false,
   });
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export function useKeyboardControls() {
       if ([
         'KeyW', 'KeyS', 'KeyA', 'KeyD',
         'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-        'KeyJ', 'KeyK', 'Space'
+        'KeyJ', 'KeyK', 'KeyU', 'KeyL', 'Space'
       ].includes(e.code)) {
         e.preventDefault();
       }
@@ -54,6 +56,10 @@ export function useKeyboardControls() {
           break;
         case 'KeyK':
           keys.current.block = true;
+          break;
+        case 'KeyU':
+        case 'KeyL':
+          keys.current.special = true;
           break;
         case 'Space':
           keys.current.dodge = true;
@@ -84,6 +90,10 @@ export function useKeyboardControls() {
           break;
         case 'KeyK':
           keys.current.block = false;
+          break;
+        case 'KeyU':
+        case 'KeyL':
+          keys.current.special = false;
           break;
         case 'Space':
           keys.current.dodge = false;

@@ -92,11 +92,13 @@ export const Analysis: React.FC = () => {
         </div>
 
         {activeTab === 'DNA' ? (
-          /* ================= BATTLE INTELLIGENCE SCREEN ================= */
           <BattleIntelligenceView
             dna={activeDNA}
-            matchOutcome={latestMatch?.outcome === 'VICTORY' || latestMatch?.outcome === 'DEFEAT' ? latestMatch.outcome : undefined}
-            onRematch={() => navigate('/arena')}
+            matchOutcome={latestMatch?.outcome === 'VICTORY' || latestMatch?.outcome === 'DEFEAT' ? latestMatch.outcome : 'VICTORY'}
+            matchDurationSeconds={latestMatch?.durationSeconds || 32}
+            matchId={latestMatch?.matchId || 'SESSION-ALPHA-01'}
+            onNextFight={() => navigate('/arena')}
+            onReplay={() => navigate('/arena')}
             onExit={() => navigate('/')}
           />
         ) : (

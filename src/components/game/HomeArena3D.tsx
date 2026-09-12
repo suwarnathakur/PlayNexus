@@ -225,15 +225,75 @@ const ArenaStage: React.FC = () => {
 };
 
 /**
- * Smooth cinematic camera controller
+ * Floating 3D cyber dust / sparks with mobile optimization
+ */
+const CyberParticles3D: React.FC = () => {
+  const pointsRef = useRef<THREE.Points>(null);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const count = isMobile ? 28 : 70;
+
+  const positions = React.useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 14;
+      pos[i * 3 + 1] = Math.random() * 6;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 8;
+    }
+    return pos;
+  }, [count]);
+
+  useFrame((state) => {
+    if (pointsRef.current) {
+      const t = state.clock.getElapsedTime();
+      const pos = pointsRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < count; i++) {
+        // Slow vertical ascent with gentle sway
+        pos[i * 3 + 1] += 0.008;
+        pos[i * 3] += Math.sin(t * 0.8 + i) * 0.003;
+        if (pos[i * 3 + 1] > 6) {
+          pos[i * 3 + 1] = 0.2;
+        }
+      }
+      pointsRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[positions, 3]}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.06}
+        color="#00f0ff"
+        transparent
+        opacity={0.6}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+};
+
+/**
+ * Smooth cinematic camera controller with reduced-motion support
  */
 const CinematicCamera: React.FC<{ mouseX: number; mouseY: number }> = ({ mouseX, mouseY }) => {
   useFrame((state) => {
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      state.camera.position.set(0, 2.4, 7);
+      state.camera.lookAt(0, 1.2, 0);
+      return;
+    }
+
     const t = state.clock.getElapsedTime();
     // Gentle cinematic sway + subtle mouse parallax
-    const targetX = Math.sin(t * 0.22) * 0.6 + mouseX * 0.8;
-    const targetY = 2.4 + Math.cos(t * 0.18) * 0.15 + mouseY * 0.4;
-    const targetZ = 6.8 + Math.sin(t * 0.14) * 0.3;
+    const targetX = Math.sin(t * 0.22) * 0.5 + mouseX * 0.6;
+    const targetY = 2.4 + Math.cos(t * 0.18) * 0.12 + mouseY * 0.3;
+    const targetZ = 6.8 + Math.sin(t * 0.14) * 0.25;
 
     state.camera.position.lerp(new THREE.Vector3(targetX, targetY, targetZ), 0.04);
     state.camera.lookAt(0, 1.2, 0);
@@ -261,6 +321,8 @@ export const HomeArena3D: React.FC<HomeArena3DProps> = ({ parallaxX = 0, paralla
     >
       <Canvas
         shadows
+        dpr={[1, 1.5]}
+        gl={{ powerPreference: 'high-performance', antialias: true }}
         camera={{ position: [0, 45, 90], fov: 50 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
       >

@@ -1,99 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '../../components/common/Logo';
 import { Scanline } from '../../components/effects/Scanline';
 import { GlowButton } from '../../components/common/GlowButton';
 import { useAuth } from '../../hooks/useAuth';
 import { useSound } from '../../hooks/useSound';
+import { CameraWeaponScanner } from '../../components/scanner/CameraWeaponScanner';
+import type { ScannedWeaponResult } from '../../services/api';
 import {
   Swords,
   ArrowLeft,
   Camera,
   Activity,
+  Zap,
   Sparkles,
-  RefreshCw,
-  X,
   Play,
 } from 'lucide-react';
-
-interface MockScannedWeapon {
-  detectedItem: string;
-  synthesizedWeapon: string;
-  perk: string;
-  powerBonus: number;
-}
-
-const MOCK_WEAPONS: MockScannedWeapon[] = [
-  {
-    detectedItem: 'BOOK',
-    synthesizedWeapon: 'TOME OF WISDOM',
-    perk: '+15% Counter Prediction Speed',
-    powerBonus: 15,
-  },
-  {
-    detectedItem: 'COFFEE MUG',
-    synthesizedWeapon: 'THERMAL PLASMA CANNON',
-    perk: '+20% Heavy Strike Impact',
-    powerBonus: 20,
-  },
-  {
-    detectedItem: 'SMARTPHONE',
-    synthesizedWeapon: 'EMP NEURAL DISRUPTOR',
-    perk: 'Stuns AI adaptation for 3.5s',
-    powerBonus: 18,
-  },
-  {
-    detectedItem: 'WATER BOTTLE',
-    synthesizedWeapon: 'CRYO KINETIC CONDENSER',
-    perk: 'Slows opponent dash recovery',
-    powerBonus: 12,
-  },
-];
 
 export const PreFight: React.FC = () => {
   const navigate = useNavigate();
   const { player } = useAuth();
   const { playSound } = useSound();
 
-  // Weapon state
-  const [selectedWeapon, setSelectedWeapon] = useState<string>('CYBERNETIC KNUCKLE GUARDS');
-  const [weaponPerk, setWeaponPerk] = useState<string>('Standard Issue Kinetic Gauntlets (+0%)');
+  // Weapon Loadout state (Defaults to Tome of Wisdom from Book scan)
+  const [selectedWeapon, setSelectedWeapon] = useState<string>('TOME OF WISDOM');
+  const [weaponType, setWeaponType] = useState<string>('Staff');
+  const [weaponBonus, setWeaponBonus] = useState<string>('+15% Ability Power');
+  const [detectedItem, setDetectedItem] = useState<string>('Book');
+  const [weaponRarity, setWeaponRarity] = useState<string>('MYTHICAL');
+  const [weaponPerk, setWeaponPerk] = useState<string>('BOOK SYNTHESIS // +15% Ability Power (Staff)');
 
-  // Scanner modal state
-  const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
-  const [isScanningActive, setIsScanningActive] = useState(false);
-  const [scanResult, setScanResult] = useState<MockScannedWeapon | null>(null);
+  // Camera Scanner modal state
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
 
   // Cinematic Arena Transition state
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [warpCountdown, setWarpCountdown] = useState(3);
 
-  const startRoomScan = () => {
-    playSound('scan');
-    setIsScanningModalOpen(true);
-    setIsScanningActive(true);
-    setScanResult(null);
+  // Restore saved loadout on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('playnexus_equipped_weapon');
+      if (stored) {
+        const parsed: ScannedWeaponResult = JSON.parse(stored);
+        setSelectedWeapon(parsed.weapon);
+        setWeaponType(parsed.type);
+        setWeaponBonus(parsed.bonus);
+        setDetectedItem(parsed.detectedItem);
+        setWeaponRarity(parsed.rarity || 'LEGENDARY');
+        setWeaponPerk(`${parsed.detectedItem.toUpperCase()} SYNTHESIS // ${parsed.bonus} (${parsed.type})`);
+      } else {
+        // Seed initial default loadout
+        const defaultWeapon: ScannedWeaponResult = {
+          detectedItem: 'Book',
+          weapon: 'Tome of Wisdom',
+          type: 'Staff',
+          bonus: '+15% Ability Power',
+          powerBonusPercent: 15,
+          lore: 'Ancient codex inscribed with arcane quantum telemetry, amplifying strike resonance.',
+          rarity: 'MYTHICAL',
+          source: 'DEFAULT_SYNTHESIS',
+        };
+        localStorage.setItem('playnexus_equipped_weapon', JSON.stringify(defaultWeapon));
+      }
+    } catch {
+      // Ignored
+    }
+  }, []);
 
-    // Simulate camera scanning sequence
-    setTimeout(() => {
-      playSound('pulse');
-    }, 700);
+  const handleEquipWeapon = (weapon: ScannedWeaponResult) => {
+    setSelectedWeapon(weapon.weapon);
+    setWeaponType(weapon.type);
+    setWeaponBonus(weapon.bonus);
+    setDetectedItem(weapon.detectedItem);
+    setWeaponRarity(weapon.rarity);
+    setWeaponPerk(`${weapon.detectedItem.toUpperCase()} SYNTHESIS // ${weapon.bonus} (${weapon.type})`);
 
-    setTimeout(() => {
-      // Pick next mock weapon
-      const randomWeapon = MOCK_WEAPONS[Math.floor(Math.random() * MOCK_WEAPONS.length)];
-      setScanResult(randomWeapon);
-      setIsScanningActive(false);
-      playSound('granted');
-    }, 1800);
-  };
-
-  const handleEquipScannedWeapon = () => {
-    if (scanResult) {
-      playSound('granted');
-      setSelectedWeapon(scanResult.synthesizedWeapon);
-      setWeaponPerk(`${scanResult.detectedItem} SYNTHESIS // ${scanResult.perk}`);
-      setIsScanningModalOpen(false);
+    try {
+      localStorage.setItem('playnexus_equipped_weapon', JSON.stringify(weapon));
+    } catch {
+      // Ignored
     }
   };
 
@@ -348,31 +334,56 @@ export const PreFight: React.FC = () => {
               </div>
             </div>
 
-            {/* Selected Weapon Box */}
+            {/* Selected Weapon Box with Scanned Real-World Metadata */}
             <div
               style={{
-                padding: '14px 16px',
-                background: 'rgba(0, 240, 255, 0.05)',
-                border: '1px dashed rgba(0, 240, 255, 0.35)',
-                borderRadius: '12px',
+                padding: '16px',
+                background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(157, 78, 221, 0.08) 100%)',
+                border: '1.5px solid rgba(0, 240, 255, 0.4)',
+                borderRadius: '14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '6px',
+                gap: '8px',
+                boxShadow: '0 0 20px rgba(0, 240, 255, 0.1)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                   EQUIPPED WEAPON:
                 </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#00ff9d', fontWeight: 700 }}>
-                  ACTIVE
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '0.64rem',
+                    color: '#000000',
+                    background: '#00ff9d',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  {weaponRarity}
                 </span>
               </div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', letterSpacing: '0.06em' }}>
-                {selectedWeapon}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '6px' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', fontWeight: 900, color: '#ffffff', letterSpacing: '0.04em' }}>
+                  {selectedWeapon}
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: '#00f0ff', fontWeight: 700 }}>
+                  TYPE: {weaponType.toUpperCase()}
+                </div>
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--accent-cyan)' }}>
-                {weaponPerk}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0, 255, 157, 0.1)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(0, 255, 157, 0.25)' }}>
+                <Zap size={14} color="#00ff9d" />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: '#00ff9d', fontWeight: 700 }}>
+                  BONUS: {weaponBonus}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                  ({detectedItem} detected)
+                </span>
               </div>
             </div>
           </div>
@@ -591,7 +602,10 @@ export const PreFight: React.FC = () => {
           <button
             type="button"
             id="scan-room-button"
-            onClick={startRoomScan}
+            onClick={() => {
+              playSound('scan');
+              setIsCameraScannerOpen(true);
+            }}
             onMouseEnter={() => playSound('hover')}
             style={{
               display: 'inline-flex',
@@ -647,191 +661,12 @@ export const PreFight: React.FC = () => {
         </div>
       </div>
 
-      {/* ================= SCAN ROOM MODAL (MOCK AI VISION SYNTHESIS) ================= */}
-      {isScanningModalOpen && (
-        <div
-          role="dialog"
-          aria-label="Room Object Scanning HUD"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(3, 5, 8, 0.88)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            zIndex: 9995,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px',
-          }}
-        >
-          <div
-            className="cyber-panel"
-            style={{
-              position: 'relative',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '36px 32px',
-              background: 'rgba(10, 15, 26, 0.95)',
-              border: '1.5px solid rgba(157, 78, 221, 0.5)',
-              borderRadius: '20px',
-              boxShadow: '0 0 50px rgba(157, 78, 221, 0.3)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              gap: '20px',
-            }}
-          >
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setIsScanningModalOpen(false)}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-              }}
-            >
-              <X size={20} />
-            </button>
-
-            {/* Scanning Viewfinder Box */}
-            <div
-              style={{
-                position: 'relative',
-                width: '100%',
-                height: '180px',
-                background: 'rgba(5, 8, 15, 0.9)',
-                border: '1px solid rgba(0, 240, 255, 0.3)',
-                borderRadius: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-              }}
-            >
-              {/* Corner Reticles */}
-              <div style={{ position: 'absolute', top: '10px', left: '10px', width: '16px', height: '16px', borderTop: '2px solid #00f0ff', borderLeft: '2px solid #00f0ff' }} />
-              <div style={{ position: 'absolute', top: '10px', right: '10px', width: '16px', height: '16px', borderTop: '2px solid #00f0ff', borderRight: '2px solid #00f0ff' }} />
-              <div style={{ position: 'absolute', bottom: '10px', left: '10px', width: '16px', height: '16px', borderBottom: '2px solid #00f0ff', borderLeft: '2px solid #00f0ff' }} />
-              <div style={{ position: 'absolute', bottom: '10px', right: '10px', width: '16px', height: '16px', borderBottom: '2px solid #00f0ff', borderRight: '2px solid #00f0ff' }} />
-
-              {/* Sweeping Laser Line */}
-              {isScanningActive && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    right: 0,
-                    height: '2px',
-                    background: '#00f0ff',
-                    boxShadow: '0 0 15px #00f0ff, 0 0 30px #00f0ff',
-                    animation: 'scannerSweep 1.2s ease-in-out infinite',
-                  }}
-                />
-              )}
-
-              {isScanningActive ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <RefreshCw size={28} color="#00f0ff" className="animate-spin" />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>
-                    SCANNING PHYSICAL ROOM...
-                  </span>
-                </div>
-              ) : scanResult ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                  <Sparkles size={32} color="#00ff9d" />
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#00ff9d', fontWeight: 700 }}>
-                    OBJECT RECOGNIZED // SYNTHESIS READY
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Scan Detection Result */}
-            {scanResult ? (
-              <div
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  background: 'rgba(0, 255, 157, 0.08)',
-                  border: '1px solid rgba(0, 255, 157, 0.3)',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                }}
-              >
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: '#ffffff' }}>
-                  <strong style={{ color: '#00f0ff' }}>{scanResult.detectedItem}</strong> detected
-                </div>
-                <div style={{ fontSize: '1.2rem', color: '#00ff9d', fontWeight: 900 }}>
-                  ↓
-                </div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 900, color: '#00ff9d' }}>
-                  {scanResult.synthesizedWeapon}
-                </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                  PERK: {scanResult.perk} (+{scanResult.powerBonus}% COMBAT SURGE)
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                Targeting environment objects with MediaPipe vision simulation...
-              </div>
-            )}
-
-            {/* Modal Actions */}
-            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
-              <button
-                type="button"
-                onClick={startRoomScan}
-                disabled={isScanningActive}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '8px',
-                  color: '#ffffff',
-                  fontFamily: 'var(--font-hud)',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  cursor: isScanningActive ? 'not-allowed' : 'pointer',
-                }}
-              >
-                RE-SCAN ROOM
-              </button>
-
-              <button
-                type="button"
-                onClick={handleEquipScannedWeapon}
-                disabled={!scanResult || isScanningActive}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  background: scanResult ? 'linear-gradient(135deg, #00f0ff, #00ff9d)' : 'rgba(255, 255, 255, 0.06)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: scanResult ? '#000000' : 'rgba(255, 255, 255, 0.3)',
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '0.85rem',
-                  fontWeight: 900,
-                  cursor: scanResult ? 'pointer' : 'not-allowed',
-                }}
-              >
-                EQUIP SYNTHESIZED WEAPON
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ================= REAL BROWSER CAMERA WEAPON SCANNER MODAL ================= */}
+      <CameraWeaponScanner
+        isOpen={isCameraScannerOpen}
+        onClose={() => setIsCameraScannerOpen(false)}
+        onEquip={handleEquipWeapon}
+      />
 
       {/* ================= CINEMATIC ARENA WARP TRANSITION ================= */}
       {isTransitioning && (

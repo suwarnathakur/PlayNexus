@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import confetti from 'canvas-confetti';
@@ -12,12 +12,29 @@ import { TelemetryCollector } from '../../game/telemetry/TelemetryCollector';
 import type { DodgeDirection } from '../../game/telemetry/TelemetryTypes';
 import { TelemetryDebugPanel } from './TelemetryDebugPanel';
 import { useTelemetryStore } from '../../store/telemetryStore';
+import { AdaptiveAI, type AdaptiveTacticalEvent } from '../../ai/adaptive/AdaptiveAI';
+import { StrategyEngine } from '../../ai/adaptive/StrategyEngine';
+import { AdaptiveAIHUD } from './AdaptiveAIHUD';
+import { DodgeLockManager } from '../../game/locks/DodgeLockManager';
+import type { DodgeLockEvent } from '../../game/locks/DodgeLockTypes';
+import { DodgeLockOverlay } from './DodgeLockOverlay';
+import { useVoiceCommands } from '../../hooks/useVoiceCommands';
+import { useDemoStore } from '../../demo/demoStore';
+import { DEMO_COUNTER_STRATEGY } from '../../demo/demoData';
 
 const ARENA_RADIUS = 6.2;
 const MOVEMENT_SPEED = 5.2;
 const ATTACK_RANGE = 2.2;
 const PLAYER_MAX_HP = 100;
 const ENEMY_MAX_HP = 100;
+
+/**
+ * Arena Game Loop Tick Helper (ticks DodgeLockManager, buffs, and challenge countdowns)
+ */
+const ArenaGameLoop: React.FC<{ onUpdate: (delta: number) => void }> = ({ onUpdate }) => {
+  useFrame((_, delta) => onUpdate(Math.min(delta, 0.1)));
+  return null;
+};
 
 /**
  * 3D Hit Spark / Impact Effect
@@ -229,6 +246,9 @@ interface EnemyFighterProps {
   playerHp: number;
   isPlayerAttacking: boolean;
   isPlayerBlocking: boolean;
+  isPlayerDodging: boolean;
+  playerComboCount: number;
+  isChallengeActive: boolean;
 }
 
 const EnemyFighter: React.FC<EnemyFighterProps> = ({
@@ -241,6 +261,9 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
   playerHp,
   isPlayerAttacking,
   isPlayerBlocking,
+  isPlayerDodging,
+  playerComboCount,
+  isChallengeActive,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -255,15 +278,29 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
     }
 
     // 1. Update AI Controller (Finite State Machine Decision & Movement Tick)
-    const playerVec = new THREE.Vector3(...playerPosition);
-    aiControllerRef.current.update(delta, position.current, playerVec, {
-      enemyHp,
-      enemyMaxHp: ENEMY_MAX_HP,
-      playerHp,
-      isPlayerAttacking,
-      isPlayerBlocking,
-      arenaRadius: ARENA_RADIUS,
-    });
+    // When challenge is active, AI flanks left to box in the player's left side
+    const targetPlayerPos = isChallengeActive
+      ? [playerPosition[0] - 1.1, playerPosition[1], playerPosition[2]] as [number, number, number]
+      : playerPosition;
+
+    const playerVec = new THREE.Vector3(...targetPlayerPos);
+    aiControllerRef.current.update(
+      delta,
+      position.current,
+      playerVec,
+      {
+        enemyHp,
+        enemyMaxHp: ENEMY_MAX_HP,
+        playerHp,
+        isPlayerAttacking,
+        isPlayerBlocking,
+        arenaRadius: ARENA_RADIUS,
+      },
+      {
+        isPlayerDodging,
+        playerComboCount,
+      }
+    );
 
     const aiState = aiControllerRef.current.getState();
 
@@ -516,10 +553,57 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     liveEvents,
     liveMetrics,
     isDebugPanelVisible,
+    fightingDNA,
     updateLiveState,
     setLatestMatch,
     clearTelemetry,
   } = useTelemetryStore();
+
+  // Equipped Weapon from Pre-Fight Camera Scan Loadout
+  const equippedWeapon = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('playnexus_equipped_weapon');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Demo Mode Store State
+  const {
+    isDemoMode,
+    demoStage,
+    isLockChallengeActive,
+    resolveChallengeSuccess,
+    completeDemoVictory,
+  } = useDemoStore();
+
+  // Adaptive Strategy Engine derived from Fighting DNA (or Demo Mode Counter Strategy)
+  const [adaptiveTacticalEvent, setAdaptiveTacticalEvent] = useState<AdaptiveTacticalEvent | null>(null);
+
+  const adaptiveStrategy = useMemo(() => {
+    if (isDemoMode && (demoStage === 'MATCH_2' || demoStage === 'LOCK_IN_CHALLENGE' || demoStage === 'DEMO_VICTORY')) {
+      return DEMO_COUNTER_STRATEGY;
+    }
+    if (fightingDNA) {
+      return StrategyEngine.generateStrategy(fightingDNA);
+    }
+    return StrategyEngine.getBaselineStrategy();
+  }, [fightingDNA, isDemoMode, demoStage]);
+
+  const adaptiveAIRef = useRef<AdaptiveAI>(
+    new AdaptiveAI(adaptiveStrategy, (evt) => {
+      setAdaptiveTacticalEvent(evt);
+    })
+  );
+
+  // Sync strategy when adaptiveStrategy changes
+  useEffect(() => {
+    adaptiveAIRef.current.setStrategy(adaptiveStrategy);
+    if (aiControllerRef.current) {
+      aiControllerRef.current.setAdaptiveAI(adaptiveAIRef.current);
+    }
+  }, [adaptiveStrategy]);
 
   // Subscribe to live telemetry updates
   useEffect(() => {
@@ -532,16 +616,50 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     return unsubscribe;
   }, [updateLiveState]);
 
+  // Dodge Direction Lock Manager & State
+  const dodgeLockManagerRef = useRef<DodgeLockManager>(new DodgeLockManager());
+  const [dodgeLockEvent, setDodgeLockEvent] = useState<DodgeLockEvent>(
+    dodgeLockManagerRef.current.getEventData()
+  );
+
+  useEffect(() => {
+    const unsubscribe = dodgeLockManagerRef.current.subscribe((evt) => {
+      setDodgeLockEvent(evt);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Demo Mode Lock Challenge Listener
+  useEffect(() => {
+    if (isDemoMode && isLockChallengeActive) {
+      dodgeLockManagerRef.current.triggerPattern('left', 'right', 83);
+    }
+  }, [isDemoMode, isLockChallengeActive]);
+
+  useEffect(() => {
+    if (isDemoMode && dodgeLockEvent.state === 'CHALLENGE_SUCCESS') {
+      resolveChallengeSuccess();
+    }
+  }, [isDemoMode, dodgeLockEvent.state, resolveChallengeSuccess]);
+
   // Handle Match Outcome Telemetry Finalization
   useEffect(() => {
     if (isVictory || isDefeat) {
       const outcome = isVictory ? 'VICTORY' : 'DEFEAT';
       const finalMatch = telemetryCollectorRef.current.endMatch(outcome, playerHp, enemyHp);
       setLatestMatch(finalMatch);
-    }
-  }, [isVictory, isDefeat, playerHp, enemyHp, setLatestMatch]);
 
-  // AI Controller Ref
+      if (isDemoMode && isVictory) {
+        if (demoStage === 'MATCH_1') {
+          useDemoStore.getState().injectMatch1Results();
+        } else if (demoStage === 'MATCH_2' || demoStage === 'LOCK_IN_CHALLENGE' || demoStage === 'DEMO_VICTORY') {
+          completeDemoVictory();
+        }
+      }
+    }
+  }, [isVictory, isDefeat, playerHp, enemyHp, setLatestMatch, isDemoMode, demoStage, completeDemoVictory]);
+
+  // AI Controller Ref hooked with AdaptiveAI
   const aiControllerRef = useRef<AIController>(
     new AIController({
       onAttackTrigger: () => {
@@ -550,7 +668,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       onStateChange: (newState) => {
         setAiCurrentState(newState);
       },
-    })
+    }, adaptiveAIRef.current)
   );
 
   // Handle Player Locomotion Telemetry
@@ -580,7 +698,42 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       const currentDist = playerPosRef.current.distanceTo(enemyPosRef.current);
       if (currentDist <= ATTACK_RANGE && !isVictory && !isDefeat) {
         if (isPlayerDodging) {
-          setLastDamageEvent({ text: 'AI ATTACK DODGED!', isCrit: false, id: Date.now() });
+          // Check if AI actively intercepted the predictable dodge direction!
+          if (adaptiveStrategy.counterDodge === 'COUNTER_LEFT') {
+            const dmg = 12;
+            setPlayerHp((hp) => {
+              const nextHp = Math.max(0, hp - dmg);
+              telemetryCollectorRef.current.recordDamageReceived({
+                damage: dmg,
+                wasBlocked: false,
+                playerHp: nextHp,
+                enemyHp,
+              });
+              return nextHp;
+            });
+            setIsPlayerHit(true);
+            playSound('denied');
+            setLastDamageEvent({ text: 'AI INTERCEPTED LEFT DODGE! -12 HP', isCrit: true, id: Date.now() });
+            setTimeout(() => setIsPlayerHit(false), 200);
+          } else if (adaptiveStrategy.counterDodge === 'COUNTER_RIGHT') {
+            const dmg = 12;
+            setPlayerHp((hp) => {
+              const nextHp = Math.max(0, hp - dmg);
+              telemetryCollectorRef.current.recordDamageReceived({
+                damage: dmg,
+                wasBlocked: false,
+                playerHp: nextHp,
+                enemyHp,
+              });
+              return nextHp;
+            });
+            setIsPlayerHit(true);
+            playSound('denied');
+            setLastDamageEvent({ text: 'AI INTERCEPTED RIGHT DODGE! -12 HP', isCrit: true, id: Date.now() });
+            setTimeout(() => setIsPlayerHit(false), 200);
+          } else {
+            setLastDamageEvent({ text: 'AI ATTACK DODGED!', isCrit: false, id: Date.now() });
+          }
         } else if (isPlayerBlocking) {
           const dmg = 4;
           setPlayerHp((hp) => {
@@ -638,7 +791,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
         const hitZ = (playerPosRef.current.z + enemyPosRef.current.z) / 2;
 
-        setHitSparks((prev) => [...prev, { id: Date.now(), pos: [hitX, 1.1, hitZ], color: '#00f0ff' }]);
+        setHitSparks((prev) => [...prev.slice(-6), { id: Date.now(), pos: [hitX, 1.1, hitZ], color: '#00f0ff' }]);
 
         const isEnemyCurrentlyBlocking = aiControllerRef.current.isBlocking();
 
@@ -665,15 +818,20 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           setComboCount(newCombo);
 
           const isCrit = newCombo >= 3;
-          const dmg = isCrit ? 26 : 16;
+          const baseDmg = isCrit ? 26 : 16;
+          const weaponMultiplier = equippedWeapon?.powerBonusPercent
+            ? 1 + equippedWeapon.powerBonusPercent / 100
+            : 1.0;
+          const dmg = Math.round(baseDmg * weaponMultiplier);
           const nextEnemyHp = Math.max(0, enemyHp - dmg);
 
           setEnemyHp(nextEnemyHp);
           setIsEnemyHit(true);
           playSound('granted');
 
+          const weaponTag = equippedWeapon ? ` [${equippedWeapon.weapon.toUpperCase()}]` : '';
           setLastDamageEvent({
-            text: isCrit ? `CRITICAL COMBO! -${dmg} HP` : `HIT! -${dmg} HP`,
+            text: isCrit ? `CRITICAL COMBO!${weaponTag} -${dmg} HP` : `HIT!${weaponTag} -${dmg} HP`,
             isCrit,
             id: Date.now(),
           });
@@ -742,6 +900,16 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       direction = Math.random() > 0.5 ? 'left' : 'right';
     }
 
+    // In Demo Mode Match 1, force direction to left to guarantee 83%+ left-dodge pattern
+    if (isDemoMode && demoStage === 'MATCH_1') {
+      direction = 'left';
+    } else if (isDemoMode && (demoStage === 'MATCH_2' || demoStage === 'LOCK_IN_CHALLENGE')) {
+      // In Match 2, auto-trigger challenge on left dodges if still idle
+      if (dodgeLockManagerRef.current.getState() === 'IDLE') {
+        dodgeLockManagerRef.current.triggerPattern('left', 'right', 83);
+      }
+    }
+
     // Record dodge telemetry
     telemetryCollectorRef.current.recordDodge({
       direction,
@@ -749,23 +917,102 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       enemyHp,
     });
 
+    // Record into Dodge Direction Lock detector
+    dodgeLockManagerRef.current.recordDodge(direction);
+
+    // Apply +20% Dodge Speed & Drift buff if reward unlocked
+    const hasReward = dodgeLockManagerRef.current.hasReward();
+    const speedMultiplier = hasReward ? 1.2 : 1.0;
+    const dodgeRecoveryMs = hasReward ? 250 : 320;
+
     const awayDir = new THREE.Vector3()
       .subVectors(playerPosRef.current, enemyPosRef.current)
       .normalize();
 
     if (direction === 'left') {
-      playerPosRef.current.x -= 1.4;
+      playerPosRef.current.x -= 1.4 * speedMultiplier;
     } else if (direction === 'right') {
-      playerPosRef.current.x += 1.4;
+      playerPosRef.current.x += 1.4 * speedMultiplier;
     } else {
-      playerPosRef.current.x += awayDir.x * 1.6;
-      playerPosRef.current.z += awayDir.z * 1.6;
+      playerPosRef.current.x += awayDir.x * 1.6 * speedMultiplier;
+      playerPosRef.current.z += awayDir.z * 1.6 * speedMultiplier;
     }
 
     setTimeout(() => {
       setIsPlayerDodging(false);
-    }, 320);
+    }, dodgeRecoveryMs);
   };
+
+  // Trigger Player Special Ability (Voice Command "Special" or Key U/L)
+  const triggerPlayerSpecial = () => {
+    if (isPlayerAttacking || isPlayerDodging || isVictory || isDefeat) return;
+
+    setIsPlayerAttacking(true);
+    playSound('granted');
+
+    const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
+    const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
+    const hitZ = (playerPosRef.current.z + enemyPosRef.current.z) / 2;
+
+    // Multi-color elemental explosion sparks
+    setHitSparks((prev) => [
+      ...prev.slice(-4),
+      { id: Date.now(), pos: [hitX, 1.3, hitZ], color: '#ffaa00' },
+      { id: Date.now() + 1, pos: [hitX - 0.2, 1.1, hitZ + 0.2], color: '#9d4edd' },
+      { id: Date.now() + 2, pos: [hitX + 0.2, 1.4, hitZ - 0.2], color: '#00ff9d' },
+    ]);
+
+    const baseDmg = 32;
+    const weaponMultiplier = equippedWeapon?.powerBonusPercent
+      ? 1 + (equippedWeapon.powerBonusPercent / 100) * 1.5
+      : 1.25;
+    const dmg = Math.round(baseDmg * weaponMultiplier);
+    const nextEnemyHp = Math.max(0, enemyHp - dmg);
+
+    setEnemyHp(nextEnemyHp);
+    setIsEnemyHit(true);
+
+    const weaponName = equippedWeapon ? equippedWeapon.weapon.toUpperCase() : 'MYTHICAL SURGE';
+    setLastDamageEvent({
+      text: `✨ SPECIAL ABILITY! [${weaponName}] -${dmg} HP`,
+      isCrit: true,
+      id: Date.now(),
+    });
+
+    telemetryCollectorRef.current.recordAttack({
+      combo: comboCount + 1,
+      distanceToEnemy: dist,
+      playerHp,
+      enemyHp: nextEnemyHp,
+    });
+    telemetryCollectorRef.current.recordHit({
+      damage: dmg,
+      combo: comboCount + 1,
+      playerHp,
+      enemyHp: nextEnemyHp,
+    });
+    telemetryCollectorRef.current.recordDamageDealt({
+      damage: dmg,
+      playerHp,
+      enemyHp: nextEnemyHp,
+    });
+
+    setTimeout(() => {
+      setIsEnemyHit(false);
+      setIsPlayerAttacking(false);
+    }, 450);
+  };
+
+  // Web Speech API Voice Commands Integration (Attack, Block, Dodge, Special)
+  const voiceCommands = useVoiceCommands({
+    onAttack: triggerPlayerAttack,
+    onBlock: () => {
+      triggerPlayerBlockStart();
+      setTimeout(() => setIsPlayerBlocking(false), 900);
+    },
+    onDodge: triggerPlayerDodge,
+    onSpecial: triggerPlayerSpecial,
+  });
 
   // Keyboard action event listener
   useEffect(() => {
@@ -776,6 +1023,8 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         triggerPlayerAttack();
       } else if (e.code === 'KeyK') {
         triggerPlayerBlockStart();
+      } else if (e.code === 'KeyU' || e.code === 'KeyL') {
+        triggerPlayerSpecial();
       } else if (e.code === 'Space') {
         triggerPlayerDodge();
       }
@@ -823,6 +1072,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     playerPosRef.current.set(-2.2, 0.2, 0);
     enemyPosRef.current.set(2.5, 0.2, 0);
     aiControllerRef.current.reset();
+    dodgeLockManagerRef.current.reset();
     setIsPlayerAttacking(false);
     setIsPlayerBlocking(false);
     setIsPlayerDodging(false);
@@ -859,6 +1109,13 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         playerMaxHp={PLAYER_MAX_HP}
         playerCodename={playerCodename}
         playerState={playerStateBadge}
+        equippedWeapon={equippedWeapon}
+        isVoiceListening={voiceCommands.isListening}
+        lastVoiceCommand={voiceCommands.lastCommand}
+        isVoiceSupported={voiceCommands.isSupported}
+        voiceError={voiceCommands.error}
+        onToggleVoice={voiceCommands.toggleListening}
+        onSpecialPress={triggerPlayerSpecial}
         enemyHp={enemyHp}
         enemyMaxHp={ENEMY_MAX_HP}
         enemyState={isVictory ? 'DEFEATED' : aiCurrentState}
@@ -889,13 +1146,27 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         />
       )}
 
+      {/* Adaptive AI Learning & Counter-Strategy HUD */}
+      <AdaptiveAIHUD
+        strategy={adaptiveStrategy}
+        tacticalEvent={adaptiveTacticalEvent}
+      />
+
+      {/* Dodge Direction Lock Cinematic Challenge Overlay */}
+      <DodgeLockOverlay event={dodgeLockEvent} />
+
       {/* 3D Canvas */}
       <Canvas
         shadows
+        dpr={[1, 1.5]}
+        gl={{ powerPreference: 'high-performance', antialias: true, stencil: false }}
         camera={{ position: [0, 3.8, 7.2], fov: 45 }}
         style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
       >
         <fog attach="fog" args={['#05070c', 5, 22]} />
+
+        {/* Dodge Lock Manager Game Loop Tick */}
+        <ArenaGameLoop onUpdate={(delta) => dodgeLockManagerRef.current.update(delta)} />
 
         {/* Lights */}
         <ambientLight intensity={0.55} />
@@ -933,7 +1204,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           onPositionUpdate={(pos, isMoving) => handlePlayerPositionUpdate(pos, isMoving)}
         />
 
-        {/* Enemy Fighter (AI Opponent using FSM) */}
+        {/* Enemy Fighter (AI Opponent using Adaptive FSM) */}
         <EnemyFighter
           position={enemyPosRef}
           playerPosition={playerCoordinates}
@@ -944,6 +1215,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           playerHp={playerHp}
           isPlayerAttacking={isPlayerAttacking}
           isPlayerBlocking={isPlayerBlocking}
+          isPlayerDodging={isPlayerDodging}
+          playerComboCount={comboCount}
+          isChallengeActive={dodgeLockEvent.state === 'CHALLENGE_ACTIVE'}
         />
       </Canvas>
     </div>

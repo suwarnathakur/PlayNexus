@@ -44,6 +44,7 @@ export const AppRoutes: React.FC = () => {
       />
       <Route path="/character-select" element={<CharacterSelect />} />
       <Route path="/pre-fight" element={<PreFight />} />
+      <Route path="/prefight" element={<PreFight />} />
       <Route path="/arena" element={<Arena />} />
       <Route path="/analysis" element={<Analysis />} />
       <Route path="/leaderboard" element={<Leaderboard />} />
