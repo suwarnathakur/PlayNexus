@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, ArrowLeft, Swords, Shield, Zap, Sparkles, RefreshCw } from 'lucide-react';
+import { Trophy, ArrowLeft, Swords, Zap, RefreshCw } from 'lucide-react';
 import { GlowButton } from '../../components/common/GlowButton';
 import { Logo } from '../../components/common/Logo';
 import { Scanline } from '../../components/effects/Scanline';

@@ -14,11 +14,9 @@ import {
   RotateCcw,
   Swords,
   ChevronRight,
-  Copy,
   Check,
   Cpu,
   Flame,
-  Award,
 } from 'lucide-react';
 import type { FightingDNAProfile } from '../../ai/FightingDNA/DNATypes';
 import { StrategyEngine } from '../../ai/adaptive/StrategyEngine';
@@ -42,7 +40,6 @@ export const BattleIntelligenceView: React.FC<BattleIntelligenceViewProps> = ({
   matchId = 'SESSION-ALPHA-01',
   onNextFight,
   onReplay,
-  onExit,
 }) => {
   const { playSound } = useSound();
   const [copiedShare, setCopiedShare] = useState(false);
@@ -103,7 +100,6 @@ export const BattleIntelligenceView: React.FC<BattleIntelligenceViewProps> = ({
 
   // Predictability evaluation
   const predVal = dna.predictabilityIndex ?? 0.78;
-  const predPct = Math.round(predVal * 100);
   const predLevel = predVal >= 0.7 ? 'HIGH' : predVal >= 0.45 ? 'MODERATE' : 'LOW';
   const predColor = predVal >= 0.7 ? '#ff0055' : predVal >= 0.45 ? '#ffaa00' : '#00ff9d';
 

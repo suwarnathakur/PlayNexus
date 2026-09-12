@@ -13,7 +13,6 @@ import {
   Camera,
   Activity,
   Zap,
-  Sparkles,
   Play,
 } from 'lucide-react';
 
@@ -28,7 +27,6 @@ export const PreFight: React.FC = () => {
   const [weaponBonus, setWeaponBonus] = useState<string>('+15% Ability Power');
   const [detectedItem, setDetectedItem] = useState<string>('Book');
   const [weaponRarity, setWeaponRarity] = useState<string>('MYTHICAL');
-  const [weaponPerk, setWeaponPerk] = useState<string>('BOOK SYNTHESIS // +15% Ability Power (Staff)');
 
   // Camera Scanner modal state
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
@@ -48,7 +46,6 @@ export const PreFight: React.FC = () => {
         setWeaponBonus(parsed.bonus);
         setDetectedItem(parsed.detectedItem);
         setWeaponRarity(parsed.rarity || 'LEGENDARY');
-        setWeaponPerk(`${parsed.detectedItem.toUpperCase()} SYNTHESIS // ${parsed.bonus} (${parsed.type})`);
       } else {
         // Seed initial default loadout
         const defaultWeapon: ScannedWeaponResult = {
@@ -74,7 +71,6 @@ export const PreFight: React.FC = () => {
     setWeaponBonus(weapon.bonus);
     setDetectedItem(weapon.detectedItem);
     setWeaponRarity(weapon.rarity);
-    setWeaponPerk(`${weapon.detectedItem.toUpperCase()} SYNTHESIS // ${weapon.bonus} (${weapon.type})`);
 
     try {
       localStorage.setItem('playnexus_equipped_weapon', JSON.stringify(weapon));

@@ -10,7 +10,6 @@ import {
   Mic,
   MicOff,
   Volume2,
-  Sparkles,
 } from 'lucide-react';
 import { GlowButton } from '../common/GlowButton';
 import { HealthBar } from './HealthBar';
@@ -70,7 +69,6 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
   isVoiceListening = false,
   lastVoiceCommand = null,
   isVoiceSupported = true,
-  voiceError = null,
   onToggleVoice,
   onExit,
   onRestartMatch,

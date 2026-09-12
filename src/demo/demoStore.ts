@@ -6,7 +6,6 @@ import type { DemoStage } from './demoTypes';
 import {
   DEMO_MATCH_1_TELEMETRY,
   DEMO_FIGHTING_DNA,
-  DEMO_COUNTER_STRATEGY,
   DEMO_POST_ADAPTATION_METRICS,
 } from './demoData';
 import { useTelemetryStore } from '../store/telemetryStore';

@@ -346,6 +346,7 @@ export const HomeArena3D: React.FC<HomeArena3DProps> = ({ parallaxX = 0, paralla
         <CinematicCamera mouseX={parallaxX} mouseY={parallaxY} />
 
         {/* 3D Elements */}
+        <CyberParticles3D />
         <ArenaStage />
         <ArenaStadium />
 

@@ -8,7 +8,6 @@ import {
   Zap,
   Check,
   Eye,
-  Sliders,
 } from 'lucide-react';
 import { scanWeaponApi, type ScannedWeaponResult } from '../../services/api';
 import { useSound } from '../../hooks/useSound';
