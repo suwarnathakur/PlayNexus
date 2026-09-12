@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import confetti from 'canvas-confetti';
 import { useNavigate } from 'react-router-dom';
 import { CombatHUD } from './CombatHUD';
+import { ArenaStadium } from '../3d/ArenaStadium';
 import { useKeyboardControls } from '../../hooks/useKeyboardControls';
 import { useSound } from '../../hooks/useSound';
 import { AIController } from '../../game/AI/AIController';
@@ -442,7 +444,51 @@ const FollowCamera: React.FC<FollowCameraProps> = ({ playerPosition }) => {
 };
 
 /**
- * Arena Stage with boundary pylons
+ * Floating Sunlit Atmospheric Dust Motes
+ */
+const SunParticles3D: React.FC = () => {
+  const pointsRef = useRef<THREE.Points>(null);
+  const count = 70;
+
+  const positions = React.useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 30;
+      pos[i * 3 + 1] = Math.random() * 9 + 0.4;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 30;
+    }
+    return pos;
+  }, [count]);
+
+  useFrame((state) => {
+    if (pointsRef.current) {
+      const t = state.clock.getElapsedTime();
+      const pos = pointsRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < count; i++) {
+        pos[i * 3 + 1] += Math.sin(t * 0.4 + i) * 0.003;
+      }
+      pointsRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.08}
+        color="#fbbf24"
+        transparent
+        opacity={0.7}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+};
+
+/**
+ * Ancient Colosseum Fighting Ground Stage with Boundary Pillars & Colonnades
  */
 const PlayableArenaStage: React.FC = () => {
   const pylonPositions = React.useMemo(() => {
@@ -461,46 +507,73 @@ const PlayableArenaStage: React.FC = () => {
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Base Platform */}
+      {/* Ancient Sandstone Central Fighting Platform */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
-        <cylinderGeometry args={[ARENA_RADIUS + 0.5, ARENA_RADIUS + 1.2, 0.4, 48]} />
-        <meshStandardMaterial color="#060911" roughness={0.8} metalness={0.2} />
+        <cylinderGeometry args={[ARENA_RADIUS + 0.5, ARENA_RADIUS + 1.2, 0.4, 64]} />
+        <meshStandardMaterial color="#d6b38f" roughness={0.85} metalness={0.05} />
       </mesh>
 
-      {/* Glowing Outer Boundary Ring */}
+      {/* Surrounding Vast Ancient Sand Ground */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.11, 0]}>
+        <circleGeometry args={[65, 64]} />
+        <meshStandardMaterial color="#d4b28c" roughness={0.9} />
+      </mesh>
+
+      {/* Ancient Stone Carved Outer Boundary Ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
-        <ringGeometry args={[ARENA_RADIUS - 0.08, ARENA_RADIUS + 0.08, 64]} />
-        <meshBasicMaterial color="#00f0ff" side={THREE.DoubleSide} />
+        <ringGeometry args={[ARENA_RADIUS - 0.14, ARENA_RADIUS + 0.14, 64]} />
+        <meshStandardMaterial color="#b58d63" roughness={0.8} />
+      </mesh>
+
+      {/* Golden Martial Border Ring */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.212, 0]}>
+        <ringGeometry args={[ARENA_RADIUS - 0.04, ARENA_RADIUS + 0.04, 64]} />
+        <meshBasicMaterial color="#eab308" side={THREE.DoubleSide} />
       </mesh>
 
       {/* Inner Hazard Warning Ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
         <ringGeometry args={[3.4, 3.55, 48]} />
-        <meshBasicMaterial color="#ff0055" side={THREE.DoubleSide} transparent opacity={0.65} />
+        <meshBasicMaterial color="#dc2626" side={THREE.DoubleSide} transparent opacity={0.65} />
       </mesh>
 
-      {/* Center Combat Glyph */}
+      {/* Center Sacred Martial Arts Seal */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
-        <ringGeometry args={[1.1, 1.22, 32]} />
-        <meshBasicMaterial color="#9d4edd" side={THREE.DoubleSide} transparent opacity={0.7} />
+        <ringGeometry args={[1.1, 1.25, 32]} />
+        <meshBasicMaterial color="#d4af37" side={THREE.DoubleSide} transparent opacity={0.8} />
       </mesh>
 
-      {/* Depth Grid */}
-      <gridHelper args={[14, 14, '#00f0ff', '#142033']} position={[0, 0.22, 0]} />
+      {/* Subtle Sand Arena Grid Pattern */}
+      <gridHelper args={[14, 14, '#b58d63', '#d6b38f']} position={[0, 0.22, 0]} />
 
-      {/* Energy Pylons */}
+      {/* Ancient Marble Boundary Columns with Golden Caps */}
       {pylonPositions.map((pos, idx) => (
         <group key={idx} position={pos}>
-          <mesh position={[0, 0, 0]}>
-            <cylinderGeometry args={[0.08, 0.1, 0.9, 12]} />
-            <meshStandardMaterial color="#1e293b" metalness={0.9} />
+          {/* Base Pedestal */}
+          <mesh position={[0, -0.15, 0]} castShadow receiveShadow>
+            <boxGeometry args={[0.32, 0.2, 0.32]} />
+            <meshStandardMaterial color="#d4af37" roughness={0.3} metalness={0.8} />
           </mesh>
-          <mesh position={[0, 0.48, 0]}>
-            <sphereGeometry args={[0.09, 12, 12]} />
-            <meshBasicMaterial color="#00f0ff" />
+          {/* Marble Column Shaft */}
+          <mesh position={[0, 0.35, 0]} castShadow>
+            <cylinderGeometry args={[0.1, 0.13, 0.8, 16]} />
+            <meshStandardMaterial color="#f8fafc" roughness={0.2} metalness={0.15} />
+          </mesh>
+          {/* Golden Capital */}
+          <mesh position={[0, 0.8, 0]} castShadow>
+            <boxGeometry args={[0.26, 0.12, 0.26]} />
+            <meshStandardMaterial color="#d4af37" roughness={0.25} metalness={0.85} />
+          </mesh>
+          {/* Sun Crystal Top */}
+          <mesh position={[0, 0.92, 0]}>
+            <sphereGeometry args={[0.08, 12, 12]} />
+            <meshStandardMaterial color="#38bdf8" emissive="#0284c7" emissiveIntensity={0.8} />
           </mesh>
         </group>
       ))}
+
+      {/* Grand Amphitheater & Colosseum Seating in the background */}
+      <ArenaStadium />
     </group>
   );
 };
@@ -1098,7 +1171,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         position: 'relative',
         width: '100vw',
         height: '100vh',
-        backgroundColor: '#05070c',
+        background: 'linear-gradient(180deg, #60a5fa 0%, #bfdbfe 100%)',
         overflow: 'hidden',
         userSelect: 'none',
       }}
@@ -1163,24 +1236,27 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         camera={{ position: [0, 3.8, 7.2], fov: 45 }}
         style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
       >
-        <fog attach="fog" args={['#05070c', 5, 22]} />
+        {/* Daytime Sky & Natural Horizon Atmosphere */}
+        <Sky sunPosition={[100, 45, 100]} inclination={0.6} azimuth={0.25} turbidity={8} rayleigh={1.2} />
+        <fog attach="fog" args={['#c8d6e5', 50, 190]} />
 
         {/* Dodge Lock Manager Game Loop Tick */}
         <ArenaGameLoop onUpdate={(delta) => dodgeLockManagerRef.current.update(delta)} />
 
-        {/* Lights */}
-        <ambientLight intensity={0.55} />
+        {/* Daytime Lighting */}
+        <ambientLight intensity={0.9} color="#ffffff" />
+        <hemisphereLight groundColor="#d4b28c" color="#dbeafe" intensity={0.7} />
         <directionalLight
-          position={[5, 10, 5]}
-          intensity={1.8}
+          position={[40, 60, 40]}
+          intensity={2.2}
           castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
         />
+        <directionalLight position={[-20, 25, -20]} intensity={0.6} color="#fef3c7" />
 
-        <pointLight position={[-4, 3, 2]} intensity={2.5} color="#00f0ff" distance={9} />
-        <pointLight position={[4, 3, 2]} intensity={2.5} color="#ff0055" distance={9} />
-        <pointLight position={[0, 4, 0]} intensity={1} color="#9d4edd" distance={8} />
+        {/* Floating Sunlit Atmosphere Dust */}
+        <SunParticles3D />
 
         {/* Arena Stage */}
         <PlayableArenaStage />
