@@ -86,7 +86,7 @@ export const AdaptiveAIHUD: React.FC<AdaptiveAIHUDProps> = ({
 
         {/* Tactic Badges */}
         <div className="flex flex-wrap gap-1 pt-0.5">
-          {strategy.activeTactics.slice(0, 2).map((tactic, idx) => (
+          {(strategy.activeTactics ?? []).slice(0, 2).map((tactic, idx) => (
             <span
               key={idx}
               className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300 text-[9px] truncate max-w-full"

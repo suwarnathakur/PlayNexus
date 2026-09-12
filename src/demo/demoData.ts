@@ -114,6 +114,8 @@ export const DEMO_FIGHTING_DNA: FightingDNAProfile = {
 export const DEMO_COUNTER_STRATEGY: CounterStrategy = {
   id: 'strategy-demo-counter-left',
   name: 'COUNTER LEFT DODGE & SWEEP FLANK',
+  tacticalDescription:
+    'The AI analyzed your Match 1 telemetry: 83% of your evasive dodges were directed LEFT. The opponent will now anticipate your left slip, sweep the recovery lane, and parry the 3rd strike of your Light-Light-Heavy string.',
   counterDodge: 'COUNTER_LEFT',
   interceptDodgeBias: 'left',
   defenseMode: 'COUNTER_RUSH',
@@ -129,12 +131,10 @@ export const DEMO_COUNTER_STRATEGY: CounterStrategy = {
   predictabilityLevel: 'HIGH',
   adaptationConfidence: 0.92,
   activeTactics: [
-    'Anticipate Left Slip',
-    'Sweep Recovery Flank',
-    'Parry 3rd Strike of 3-Hit Combo',
+    'COUNTER LEFT DODGE // INTERCEPT FLANK (83% BIAS)',
+    'ANTI-COMBO ADAPTATION // AUTO-BLOCK & PARRY (LIGHT-LIGHT-HEAVY)',
+    'RELENTLESS RUSHDOWN // SPRINT CLOSURE & BOUNDARY PIN',
   ],
-  tacticalDescription:
-    'The AI analyzed your Match 1 telemetry: 83% of your evasive dodges were directed LEFT. The opponent will now anticipate your left slip, sweep the recovery lane, and parry the 3rd strike of your Light-Light-Heavy string.',
 };
 
 /**
