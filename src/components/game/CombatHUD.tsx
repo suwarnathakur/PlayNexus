@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Activity, Swords, Zap, RotateCcw, Award } from 'lucide-react';
+import { ArrowLeft, Activity, Swords, Zap, RotateCcw, Award, Dna } from 'lucide-react';
 import { GlowButton } from '../common/GlowButton';
 import { HealthBar } from './HealthBar';
 
@@ -473,8 +473,8 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
                   letterSpacing: '0.08em',
                 }}
               >
-                <Award size={16} />
-                <span>VIEW DNA REPORT</span>
+                <Dna size={16} />
+                <span>BATTLE INTELLIGENCE</span>
               </button>
             </div>
           </div>

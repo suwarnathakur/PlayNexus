@@ -8,6 +8,10 @@ import { useKeyboardControls } from '../../hooks/useKeyboardControls';
 import { useSound } from '../../hooks/useSound';
 import { AIController } from '../../game/AI/AIController';
 import type { AIStateType } from '../../game/AI/AIState';
+import { TelemetryCollector } from '../../game/telemetry/TelemetryCollector';
+import type { DodgeDirection } from '../../game/telemetry/TelemetryTypes';
+import { TelemetryDebugPanel } from './TelemetryDebugPanel';
+import { useTelemetryStore } from '../../store/telemetryStore';
 
 const ARENA_RADIUS = 6.2;
 const MOVEMENT_SPEED = 5.2;
@@ -473,10 +477,14 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const navigate = useNavigate();
   const { playSound } = useSound();
 
+  const keys = useKeyboardControls();
+
   // Positions
   const playerPosRef = useRef(new THREE.Vector3(-2.2, 0.2, 0));
   const enemyPosRef = useRef(new THREE.Vector3(2.5, 0.2, 0));
   const [playerCoordinates, setPlayerCoordinates] = useState<[number, number, number]>([-2.2, 0.2, 0]);
+  const lastReportedPos = useRef<[number, number, number]>([-2.2, 0.2, 0]);
+  const accumulatedMoveDist = useRef(0);
 
   // Health
   const [playerHp, setPlayerHp] = useState<number>(PLAYER_MAX_HP);
@@ -502,6 +510,37 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const isVictory = enemyHp <= 0;
   const isDefeat = playerHp <= 0;
 
+  // Telemetry Collector & Global Store
+  const telemetryCollectorRef = useRef<TelemetryCollector>(new TelemetryCollector());
+  const {
+    liveEvents,
+    liveMetrics,
+    isDebugPanelVisible,
+    updateLiveState,
+    setLatestMatch,
+    clearTelemetry,
+  } = useTelemetryStore();
+
+  // Subscribe to live telemetry updates
+  useEffect(() => {
+    const collector = telemetryCollectorRef.current;
+    const unsubscribe = collector.subscribe((_, metrics) => {
+      updateLiveState([...collector.getRecentEvents(30)], metrics);
+    });
+    // Prime initial metrics
+    updateLiveState(collector.getRecentEvents(30), collector.getLiveMetrics());
+    return unsubscribe;
+  }, [updateLiveState]);
+
+  // Handle Match Outcome Telemetry Finalization
+  useEffect(() => {
+    if (isVictory || isDefeat) {
+      const outcome = isVictory ? 'VICTORY' : 'DEFEAT';
+      const finalMatch = telemetryCollectorRef.current.endMatch(outcome, playerHp, enemyHp);
+      setLatestMatch(finalMatch);
+    }
+  }, [isVictory, isDefeat, playerHp, enemyHp, setLatestMatch]);
+
   // AI Controller Ref
   const aiControllerRef = useRef<AIController>(
     new AIController({
@@ -513,6 +552,23 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       },
     })
   );
+
+  // Handle Player Locomotion Telemetry
+  const handlePlayerPositionUpdate = (pos: [number, number, number], isMoving: boolean) => {
+    setPlayerCoordinates(pos);
+    if (isMoving && !isVictory && !isDefeat) {
+      const dist = Math.hypot(pos[0] - lastReportedPos.current[0], pos[2] - lastReportedPos.current[2]);
+      accumulatedMoveDist.current += dist;
+      if (accumulatedMoveDist.current >= 1.2) {
+        telemetryCollectorRef.current.recordMovement({
+          distance: accumulatedMoveDist.current,
+          playerHp,
+        });
+        accumulatedMoveDist.current = 0;
+      }
+    }
+    lastReportedPos.current = pos;
+  };
 
   // Enemy Attack Execution Handler
   const handleAIAttackStrike = () => {
@@ -527,12 +583,30 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           setLastDamageEvent({ text: 'AI ATTACK DODGED!', isCrit: false, id: Date.now() });
         } else if (isPlayerBlocking) {
           const dmg = 4;
-          setPlayerHp(hp => Math.max(0, hp - dmg));
+          setPlayerHp((hp) => {
+            const nextHp = Math.max(0, hp - dmg);
+            telemetryCollectorRef.current.recordDamageReceived({
+              damage: dmg,
+              wasBlocked: true,
+              playerHp: nextHp,
+              enemyHp,
+            });
+            return nextHp;
+          });
           playSound('scan');
           setLastDamageEvent({ text: `BLOCKED ENEMY! -${dmg} HP`, isCrit: false, id: Date.now() });
         } else {
           const dmg = 14;
-          setPlayerHp(hp => Math.max(0, hp - dmg));
+          setPlayerHp((hp) => {
+            const nextHp = Math.max(0, hp - dmg);
+            telemetryCollectorRef.current.recordDamageReceived({
+              damage: dmg,
+              wasBlocked: false,
+              playerHp: nextHp,
+              enemyHp,
+            });
+            return nextHp;
+          });
           setIsPlayerHit(true);
           playSound('denied');
           setLastDamageEvent({ text: `ENEMY STRIKE! -${dmg} HP`, isCrit: true, id: Date.now() });
@@ -551,28 +625,50 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
 
     const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
 
+    // Record attack input telemetry
+    telemetryCollectorRef.current.recordAttack({
+      combo: comboCount + 1,
+      distanceToEnemy: dist,
+      playerHp,
+      enemyHp,
+    });
+
     setTimeout(() => {
       if (dist <= ATTACK_RANGE && !isVictory && !isDefeat) {
         const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
         const hitZ = (playerPosRef.current.z + enemyPosRef.current.z) / 2;
 
-        setHitSparks(prev => [...prev, { id: Date.now(), pos: [hitX, 1.1, hitZ], color: '#00f0ff' }]);
+        setHitSparks((prev) => [...prev, { id: Date.now(), pos: [hitX, 1.1, hitZ], color: '#00f0ff' }]);
 
         const isEnemyCurrentlyBlocking = aiControllerRef.current.isBlocking();
 
         if (isEnemyCurrentlyBlocking) {
           const dmg = 5;
-          setEnemyHp(hp => Math.max(0, hp - dmg));
+          const nextEnemyHp = Math.max(0, enemyHp - dmg);
+          setEnemyHp(nextEnemyHp);
           playSound('scan');
           setLastDamageEvent({ text: `AI BLOCKED! -${dmg} HP`, isCrit: false, id: Date.now() });
+
+          telemetryCollectorRef.current.recordHit({
+            damage: dmg,
+            combo: 1,
+            playerHp,
+            enemyHp: nextEnemyHp,
+          });
+          telemetryCollectorRef.current.recordDamageDealt({
+            damage: dmg,
+            playerHp,
+            enemyHp: nextEnemyHp,
+          });
         } else {
           const newCombo = comboCount + 1;
           setComboCount(newCombo);
 
           const isCrit = newCombo >= 3;
           const dmg = isCrit ? 26 : 16;
+          const nextEnemyHp = Math.max(0, enemyHp - dmg);
 
-          setEnemyHp(hp => Math.max(0, hp - dmg));
+          setEnemyHp(nextEnemyHp);
           setIsEnemyHit(true);
           playSound('granted');
 
@@ -580,6 +676,18 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
             text: isCrit ? `CRITICAL COMBO! -${dmg} HP` : `HIT! -${dmg} HP`,
             isCrit,
             id: Date.now(),
+          });
+
+          telemetryCollectorRef.current.recordHit({
+            damage: dmg,
+            combo: newCombo,
+            playerHp,
+            enemyHp: nextEnemyHp,
+          });
+          telemetryCollectorRef.current.recordDamageDealt({
+            damage: dmg,
+            playerHp,
+            enemyHp: nextEnemyHp,
           });
 
           setTimeout(() => setIsEnemyHit(false), 200);
@@ -590,25 +698,69 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           }, 2000);
         }
       } else {
+        // Record missed swing
+        telemetryCollectorRef.current.recordMiss({
+          distanceToEnemy: dist,
+          playerHp,
+          enemyHp,
+        });
         setComboCount(0);
       }
       setIsPlayerAttacking(false);
     }, 220);
   };
 
-  // Trigger Player Dodge
+  // Trigger Player Block
+  const triggerPlayerBlockStart = () => {
+    if (isPlayerDodging || isVictory || isDefeat) return;
+    setIsPlayerBlocking(true);
+    telemetryCollectorRef.current.recordBlock({
+      playerHp,
+      enemyHp,
+    });
+  };
+
+  // Trigger Player Dodge with Directional Recognition
   const triggerPlayerDodge = () => {
     if (isPlayerDodging || isPlayerAttacking || isVictory || isDefeat) return;
 
     setIsPlayerDodging(true);
     playSound('scan');
 
+    // Directional recognition based on active keys & relative position
+    let direction: DodgeDirection = 'neutral';
+    if (keys.current.left) {
+      direction = 'left';
+    } else if (keys.current.right) {
+      direction = 'right';
+    } else if (keys.current.backward) {
+      direction = 'backward';
+    } else if (keys.current.forward) {
+      direction = 'forward';
+    } else {
+      // Default lateral escape if neutral
+      direction = Math.random() > 0.5 ? 'left' : 'right';
+    }
+
+    // Record dodge telemetry
+    telemetryCollectorRef.current.recordDodge({
+      direction,
+      playerHp,
+      enemyHp,
+    });
+
     const awayDir = new THREE.Vector3()
       .subVectors(playerPosRef.current, enemyPosRef.current)
       .normalize();
 
-    playerPosRef.current.x += awayDir.x * 1.6;
-    playerPosRef.current.z += awayDir.z * 1.6;
+    if (direction === 'left') {
+      playerPosRef.current.x -= 1.4;
+    } else if (direction === 'right') {
+      playerPosRef.current.x += 1.4;
+    } else {
+      playerPosRef.current.x += awayDir.x * 1.6;
+      playerPosRef.current.z += awayDir.z * 1.6;
+    }
 
     setTimeout(() => {
       setIsPlayerDodging(false);
@@ -623,7 +775,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       if (e.code === 'KeyJ') {
         triggerPlayerAttack();
       } else if (e.code === 'KeyK') {
-        setIsPlayerBlocking(true);
+        triggerPlayerBlockStart();
       } else if (e.code === 'Space') {
         triggerPlayerDodge();
       }
@@ -674,6 +826,10 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     setIsPlayerAttacking(false);
     setIsPlayerBlocking(false);
     setIsPlayerDodging(false);
+
+    // Reset telemetry
+    telemetryCollectorRef.current.startMatch();
+    clearTelemetry();
   };
 
   const playerStateBadge = isPlayerDodging
@@ -715,11 +871,23 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         onNavigateAnalysis={() => navigate('/analysis')}
         onAttackPress={triggerPlayerAttack}
         onBlockPress={() => {
-          setIsPlayerBlocking(true);
+          triggerPlayerBlockStart();
           setTimeout(() => setIsPlayerBlocking(false), 600);
         }}
         onDodgePress={triggerPlayerDodge}
       />
+
+      {/* Telemetry Real-time Debug HUD */}
+      {isDebugPanelVisible && (
+        <TelemetryDebugPanel
+          events={liveEvents}
+          metrics={liveMetrics}
+          onClear={() => {
+            telemetryCollectorRef.current.startMatch();
+            clearTelemetry();
+          }}
+        />
+      )}
 
       {/* 3D Canvas */}
       <Canvas
@@ -762,7 +930,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           isBlocking={isPlayerBlocking}
           isDodging={isPlayerDodging}
           isHit={isPlayerHit}
-          onPositionUpdate={(pos) => setPlayerCoordinates(pos)}
+          onPositionUpdate={(pos, isMoving) => handlePlayerPositionUpdate(pos, isMoving)}
         />
 
         {/* Enemy Fighter (AI Opponent using FSM) */}
