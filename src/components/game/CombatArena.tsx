@@ -171,8 +171,8 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       <mesh position={[0, 0.9, 0]} castShadow>
         <capsuleGeometry args={[0.3, 0.6, 8, 16]} />
         <meshStandardMaterial
-          color={isHit ? '#ffffff' : '#0f172a'}
-          roughness={0.3}
+          color={isHit ? '#ffffff' : '#e2e8f0'}
+          roughness={0.2}
           metalness={0.8}
         />
       </mesh>
@@ -180,7 +180,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       {/* Cyan Chest Plate */}
       <mesh position={[0, 0.95, 0.2]}>
         <boxGeometry args={[0.48, 0.45, 0.1]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.2} metalness={0.9} />
+        <meshStandardMaterial color="#0284c7" roughness={0.15} metalness={0.9} />
       </mesh>
 
       {/* Core Reactor Glow */}
@@ -192,7 +192,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       {/* Head */}
       <mesh position={[0, 1.6, 0]}>
         <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial color="#0b0e14" roughness={0.4} metalness={0.7} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.85} />
       </mesh>
 
       {/* Cyan Visor */}
@@ -207,7 +207,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
         scale={isAttacking ? [1.3, 1.3, 1.8] : [1, 1, 1]}
       >
         <boxGeometry args={[0.18, 0.35, 0.18]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
       </mesh>
       <mesh position={[-0.38, isAttacking ? 1.15 : 0.72, isAttacking ? 0.8 : 0.24]}>
         <boxGeometry args={[0.14, 0.14, 0.14]} />
@@ -217,7 +217,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       {/* Right Fist / Guard Gauntlet */}
       <mesh position={[0.38, isBlocking ? 1.15 : 0.9, isBlocking ? 0.45 : 0.2]}>
         <boxGeometry args={[0.18, 0.35, 0.18]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
       </mesh>
       <mesh position={[0.38, isBlocking ? 1.15 : 0.72, isBlocking ? 0.55 : 0.24]}>
         <boxGeometry args={[0.14, 0.14, 0.14]} />
@@ -354,9 +354,9 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
       <mesh position={[0, 0.95, 0]} castShadow>
         <boxGeometry args={[0.75, 0.8, 0.45]} />
         <meshStandardMaterial
-          color={isHit ? '#ffffff' : '#180d1e'}
-          roughness={0.3}
-          metalness={0.85}
+          color={isHit ? '#ffffff' : '#dc2626'}
+          roughness={0.2}
+          metalness={0.8}
         />
       </mesh>
 
@@ -369,17 +369,17 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
       {/* Head */}
       <mesh position={[0, 1.62, 0]}>
         <sphereGeometry args={[0.24, 16, 16]} />
-        <meshStandardMaterial color="#0d0812" roughness={0.4} metalness={0.7} />
+        <meshStandardMaterial color="#991b1b" roughness={0.25} metalness={0.8} />
       </mesh>
 
       {/* Intimidating Crest / Horns */}
       <mesh position={[-0.14, 1.84, 0]} rotation={[0, 0, -0.35]}>
         <coneGeometry args={[0.06, 0.26, 8]} />
-        <meshStandardMaterial color="#ff0055" />
+        <meshStandardMaterial color="#ff0055" roughness={0.1} metalness={0.9} emissive="#ff0055" emissiveIntensity={0.5} />
       </mesh>
       <mesh position={[0.14, 1.84, 0]} rotation={[0, 0, 0.35]}>
         <coneGeometry args={[0.06, 0.26, 8]} />
-        <meshStandardMaterial color="#ff0055" />
+        <meshStandardMaterial color="#ff0055" roughness={0.1} metalness={0.9} emissive="#ff0055" emissiveIntensity={0.5} />
       </mesh>
 
       {/* Crimson Visor Slit */}
@@ -394,13 +394,13 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
         scale={isAttacking ? [1.3, 1.3, 1.8] : [1, 1, 1]}
       >
         <boxGeometry args={[0.22, 0.42, 0.22]} />
-        <meshStandardMaterial color="#2d132c" roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color="#b91c1c" roughness={0.3} metalness={0.85} />
       </mesh>
 
       {/* Right Guard Fist */}
       <mesh position={[0.42, isBlocking ? 1.15 : 0.9, isBlocking ? 0.45 : 0.22]}>
         <boxGeometry args={[0.22, 0.42, 0.22]} />
-        <meshStandardMaterial color="#2d132c" roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color="#b91c1c" roughness={0.3} metalness={0.85} />
       </mesh>
 
       {/* Shadow */}

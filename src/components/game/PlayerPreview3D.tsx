@@ -28,7 +28,7 @@ const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = ({
       {/* Head */}
       <mesh position={[0, 1.72, 0]}>
         <sphereGeometry args={[0.24, 20, 20]} />
-        <meshStandardMaterial color="#0f172a" roughness={0.3} metalness={0.8} />
+        <meshStandardMaterial color="#cbd5e1" roughness={0.25} metalness={0.85} />
       </mesh>
 
       {/* Cyber Visor Glow */}
@@ -40,17 +40,23 @@ const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = ({
       {/* Neck */}
       <mesh position={[0, 1.46, 0]}>
         <cylinderGeometry args={[0.1, 0.12, 0.14, 16]} />
-        <meshStandardMaterial color="#080b10" />
+        <meshStandardMaterial color="#94a3b8" metalness={0.8} />
       </mesh>
 
       {/* Chest Armor Plate */}
       <mesh position={[0, 1.1, 0]} castShadow>
         <boxGeometry args={[0.7, 0.68, 0.4]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.3} metalness={0.85} />
+        <meshStandardMaterial color="#e2e8f0" roughness={0.2} metalness={0.85} />
+      </mesh>
+
+      {/* Chest Accent Plates */}
+      <mesh position={[0, 1.12, 0.21]}>
+        <boxGeometry args={[0.45, 0.42, 0.06]} />
+        <meshStandardMaterial color="#0284c7" roughness={0.15} metalness={0.9} />
       </mesh>
 
       {/* Chest Reactor Light */}
-      <mesh position={[0, 1.15, 0.22]}>
+      <mesh position={[0, 1.15, 0.25]}>
         <sphereGeometry args={[0.1, 16, 16]} />
         <meshBasicMaterial color={glowColor} />
       </mesh>
@@ -58,41 +64,41 @@ const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = ({
       {/* Belt / Pelvis */}
       <mesh position={[0, 0.66, 0]}>
         <cylinderGeometry args={[0.24, 0.28, 0.32, 16]} />
-        <meshStandardMaterial color="#0b0f19" roughness={0.5} metalness={0.7} />
+        <meshStandardMaterial color="#64748b" roughness={0.3} metalness={0.8} />
       </mesh>
 
       {/* Left Guard Arm & Fist */}
       <mesh position={[-0.38, 1.05, 0.2]} rotation={[0.4, 0.3, -0.2]}>
         <boxGeometry args={[0.18, 0.46, 0.18]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
       </mesh>
       {/* Left Glowing Combat Knuckle */}
       <mesh position={[-0.42, 1.25, 0.4]}>
         <boxGeometry args={[0.14, 0.14, 0.14]} />
-        <meshStandardMaterial color={isMelee ? glowColor : '#64748b'} roughness={0.2} metalness={0.9} />
+        <meshStandardMaterial color={isMelee ? glowColor : '#38bdf8'} roughness={0.1} metalness={0.9} />
       </mesh>
 
       {/* Right Guard Arm & Fist */}
       <mesh position={[0.38, 1.05, 0.2]} rotation={[0.4, -0.3, 0.2]}>
         <boxGeometry args={[0.18, 0.46, 0.18]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color="#0ea5e9" roughness={0.3} metalness={0.85} />
       </mesh>
       {/* Right Glowing Combat Knuckle */}
       <mesh position={[0.42, 1.25, 0.4]}>
         <boxGeometry args={[0.14, 0.14, 0.14]} />
-        <meshStandardMaterial color={isMelee ? glowColor : '#64748b'} roughness={0.2} metalness={0.9} />
+        <meshStandardMaterial color={isMelee ? glowColor : '#38bdf8'} roughness={0.1} metalness={0.9} />
       </mesh>
 
       {/* Left Leg */}
       <mesh position={[-0.18, 0.3, 0]}>
         <boxGeometry args={[0.22, 0.65, 0.22]} />
-        <meshStandardMaterial color="#080b10" roughness={0.5} metalness={0.7} />
+        <meshStandardMaterial color="#94a3b8" roughness={0.3} metalness={0.8} />
       </mesh>
 
       {/* Right Leg */}
       <mesh position={[0.18, 0.3, 0]}>
         <boxGeometry args={[0.22, 0.65, 0.22]} />
-        <meshStandardMaterial color="#080b10" roughness={0.5} metalness={0.7} />
+        <meshStandardMaterial color="#94a3b8" roughness={0.3} metalness={0.8} />
       </mesh>
 
       {/* Ground Shadow */}

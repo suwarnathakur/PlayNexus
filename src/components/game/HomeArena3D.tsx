@@ -49,13 +49,13 @@ const FighterSilhouette: React.FC<FighterSilhouetteProps> = ({
       {/* Neck */}
       <mesh position={[0, 1.48, 0]}>
         <cylinderGeometry args={[0.09, 0.11, 0.14, 12]} />
-        <meshStandardMaterial color="#0b0e14" />
+        <meshStandardMaterial color={isAi ? '#991b1b' : '#94a3b8'} roughness={0.3} metalness={0.8} />
       </mesh>
 
       {/* Chest & Torso */}
       <mesh position={[0, 1.12, 0]} castShadow>
         <boxGeometry args={[0.65, 0.65, 0.38]} />
-        <meshStandardMaterial color={baseColor} roughness={0.3} metalness={0.85} />
+        <meshStandardMaterial color={baseColor} roughness={0.25} metalness={0.85} />
       </mesh>
 
       {/* Glowing Core Reactor */}
@@ -67,36 +67,36 @@ const FighterSilhouette: React.FC<FighterSilhouetteProps> = ({
       {/* Abdomen / Waist */}
       <mesh position={[0, 0.68, 0]}>
         <cylinderGeometry args={[0.22, 0.26, 0.32, 16]} />
-        <meshStandardMaterial color="#080b10" roughness={0.6} metalness={0.7} />
+        <meshStandardMaterial color={isAi ? '#7f1d1d' : '#64748b'} roughness={0.4} metalness={0.75} />
       </mesh>
 
       {/* Left Guard Arm (Forward Fist) */}
       <mesh position={[isAi ? -0.28 : 0.28, 1.1, isAi ? -0.25 : 0.25]} rotation={[0.4, isAi ? -0.5 : 0.5, 0]}>
         <boxGeometry args={[0.18, 0.45, 0.18]} />
-        <meshStandardMaterial color={baseColor} roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color={isAi ? '#b91c1c' : '#0ea5e9'} roughness={0.3} metalness={0.85} />
       </mesh>
       {/* Left Forearm / Fist */}
       <mesh position={[isAi ? -0.42 : 0.42, 1.28, isAi ? -0.15 : 0.15]}>
         <boxGeometry args={[0.16, 0.16, 0.16]} />
-        <meshStandardMaterial color={glowColor} roughness={0.2} metalness={0.9} />
+        <meshStandardMaterial color={glowColor} roughness={0.1} metalness={0.9} />
       </mesh>
 
       {/* Right Guard Arm */}
       <mesh position={[0, 1.05, isAi ? 0.32 : -0.32]}>
         <boxGeometry args={[0.18, 0.48, 0.18]} />
-        <meshStandardMaterial color={baseColor} roughness={0.4} metalness={0.8} />
+        <meshStandardMaterial color={isAi ? '#b91c1c' : '#0ea5e9'} roughness={0.3} metalness={0.85} />
       </mesh>
 
       {/* Left Leg */}
       <mesh position={[isAi ? 0.14 : -0.14, 0.32, 0.14]}>
         <boxGeometry args={[0.2, 0.64, 0.2]} />
-        <meshStandardMaterial color="#080b10" roughness={0.5} metalness={0.7} />
+        <meshStandardMaterial color={isAi ? '#991b1b' : '#94a3b8'} roughness={0.3} metalness={0.8} />
       </mesh>
 
       {/* Right Leg */}
       <mesh position={[isAi ? -0.18 : 0.18, 0.32, -0.14]}>
         <boxGeometry args={[0.2, 0.64, 0.2]} />
-        <meshStandardMaterial color="#080b10" roughness={0.5} metalness={0.7} />
+        <meshStandardMaterial color={isAi ? '#991b1b' : '#94a3b8'} roughness={0.3} metalness={0.8} />
       </mesh>
 
       {/* Ground Shadow Disc */}
@@ -353,15 +353,15 @@ export const HomeArena3D: React.FC<HomeArena3DProps> = ({ parallaxX = 0, paralla
         {/* Player Fighter Silhouette (Left) */}
         <FighterSilhouette
           position={[-2.1, 0.22, 0]}
-          baseColor="#0f172a"
+          baseColor="#e2e8f0"
           glowColor="#00f0ff"
         />
 
         {/* AI Opponent Fighter Silhouette (Right) */}
         <FighterSilhouette
           position={[2.1, 0.22, 0]}
-          baseColor="#1c0e24"
-          glowColor="#ff3366"
+          baseColor="#dc2626"
+          glowColor="#ff0055"
           isAi
         />
       </Canvas>
