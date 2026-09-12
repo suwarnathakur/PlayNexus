@@ -7,6 +7,7 @@ import { GlowButton } from '../../components/common/GlowButton';
 import { useAuth } from '../../hooks/useAuth';
 import { useSound } from '../../hooks/useSound';
 import { useMouseParallax } from '../../hooks/useMouseParallax';
+import { TacticalHUDOverlay } from '../../components/ui/TacticalHUDOverlay';
 import {
   Swords,
   Dna,
@@ -75,6 +76,8 @@ export const Home: React.FC<HomeProps> = ({ onNavigateLogin }) => {
 
       {/* 2. CRT Scanline Overlay */}
       <Scanline />
+
+      <TacticalHUDOverlay />
 
       {/* 3. Foreground HUD & Interface Container */}
       <div

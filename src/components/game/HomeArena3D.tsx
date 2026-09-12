@@ -1,6 +1,9 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { Sky } from '@react-three/drei';
 import * as THREE from 'three';
+import { ArenaCenterpiece } from '../3d/ArenaCenterpiece';
+import { ArenaStadium } from '../3d/ArenaStadium';
 
 interface FighterSilhouetteProps {
   position: [number, number, number];
@@ -106,116 +109,118 @@ const FighterSilhouette: React.FC<FighterSilhouetteProps> = ({
 };
 
 /**
- * Sweeping Hologram AI Scanning Laser Beam
+ * Central winged spire, fantasy stadium seating, and grand colosseum geometry
  */
-const AIScanningBeam: React.FC = () => {
-  const beamRef = useRef<THREE.Mesh>(null);
+const WingedSpire: React.FC = () => {
+  const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
-    if (beamRef.current) {
+    if (groupRef.current) {
       const t = state.clock.getElapsedTime();
-      beamRef.current.position.x = Math.sin(t * 1.6) * 3.2;
+      groupRef.current.rotation.y = Math.sin(t * 0.25) * 0.12;
     }
   });
 
   return (
-    <mesh ref={beamRef} position={[0, 1.2, 0]} rotation={[0, 0, 0]}>
-      <planeGeometry args={[0.06, 3.5]} />
-      <meshBasicMaterial
-        color="#00f0ff"
-        transparent
-        opacity={0.45}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
+    <group ref={groupRef} position={[0, 0.4, 0]}>
+      <mesh position={[0, 5.8, 0]} castShadow>
+        <cylinderGeometry args={[0.5, 0.7, 12.5, 32]} />
+        <meshStandardMaterial color="#f3f7ff" metalness={0.9} roughness={0.2} />
+      </mesh>
+
+      <mesh position={[0, 11.5, 0]}>
+        <sphereGeometry args={[0.9, 32, 32]} />
+        <meshStandardMaterial color="#cfe3ff" emissive="#89d7ff" emissiveIntensity={1.2} />
+      </mesh>
+
+      {[-1, 1].map((side) => (
+        <group key={side} position={[0, 6.8, 0]} rotation={[0, 0, side * 0.18]}>
+          <mesh position={[side * 8.5, 0.6, 0]} rotation={[0, 0, side * -0.45]} castShadow>
+            <boxGeometry args={[0.4, 8.4, 4.4]} />
+            <meshStandardMaterial color="#f7fbff" metalness={0.85} roughness={0.2} />
+          </mesh>
+
+          <mesh position={[side * 12.5, 1.2, 0]} rotation={[0, 0, side * -0.7]} castShadow>
+            <boxGeometry args={[0.32, 6.4, 3.2]} />
+            <meshStandardMaterial color="#e5efff" metalness={0.9} roughness={0.15} />
+          </mesh>
+        </group>
+      ))}
+    </group>
   );
 };
 
-/**
- * 3D Arena Stage with glowing boundary rings and depth grid
- */
+const StadiumSeating: React.FC = () => {
+  const seats = React.useMemo(() => {
+    const rows: React.ReactNode[] = [];
+    for (let row = 0; row < 8; row++) {
+      const radius = 15 + row * 2.5;
+      const count = 26 + row * 3;
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        const y = 0.8 + row * 0.28;
+        rows.push(
+          <mesh
+            key={`${row}-${i}`}
+            position={[x, y, z]}
+            rotation={[0, -angle + Math.PI / 2, 0]}
+            castShadow
+          >
+            <boxGeometry args={[0.9, 0.45, 0.9]} />
+            <meshStandardMaterial color={row % 2 === 0 ? '#f2e6d2' : '#d9c7b2'} roughness={0.9} />
+          </mesh>
+        );
+      }
+    }
+    return rows;
+  }, []);
+
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.35, 0]}>
+        <ringGeometry args={[15, 23, 96]} />
+        <meshStandardMaterial color="#efe2ce" roughness={0.9} />
+      </mesh>
+      {seats}
+    </group>
+  );
+};
+
 const ArenaStage: React.FC = () => {
   return (
     <group position={[0, 0, 0]}>
-      {/* Main Center Platform */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
-        <cylinderGeometry args={[7.5, 8.2, 0.4, 48]} />
-        <meshStandardMaterial color="#070a10" roughness={0.8} metalness={0.2} />
+        <cylinderGeometry args={[7.5, 8.2, 0.4, 64]} />
+        <meshStandardMaterial color="#d6b38f" roughness={0.8} metalness={0.1} />
       </mesh>
 
-      {/* Outer Cyan Combat Ring */}
+      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.11, 0]}>
+        <circleGeometry args={[40, 64]} />
+        <meshStandardMaterial color="#d4b28c" roughness={0.8} />
+      </mesh>
+
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
         <ringGeometry args={[6.4, 6.6, 64]} />
-        <meshBasicMaterial color="#00f0ff" side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#59d2ff" side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Inner Danger Ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
         <ringGeometry args={[3.6, 3.75, 48]} />
         <meshBasicMaterial color="#ff0055" side={THREE.DoubleSide} transparent opacity={0.7} />
       </mesh>
 
-      {/* Center AI Target Emblem */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
         <ringGeometry args={[1.2, 1.3, 32]} />
         <meshBasicMaterial color="#9d4edd" side={THREE.DoubleSide} transparent opacity={0.6} />
       </mesh>
 
-      {/* Perspective Stage Depth Grid */}
       <gridHelper args={[16, 16, '#00f0ff', '#162238']} position={[0, 0.22, 0]} />
+      <StadiumSeating />
+      <WingedSpire />
+      <ArenaCenterpiece />
     </group>
-  );
-};
-
-/**
- * Floating 3D cyber dust / sparks
- */
-const CyberParticles3D: React.FC = () => {
-  const pointsRef = useRef<THREE.Points>(null);
-  const count = 75;
-
-  const positions = React.useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 14;
-      pos[i * 3 + 1] = Math.random() * 6;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 8;
-    }
-    return pos;
-  }, []);
-
-  useFrame((state) => {
-    if (pointsRef.current) {
-      const t = state.clock.getElapsedTime();
-      const pos = pointsRef.current.geometry.attributes.position.array as Float32Array;
-      for (let i = 0; i < count; i++) {
-        // Slow vertical ascent with gentle sway
-        pos[i * 3 + 1] += 0.008;
-        pos[i * 3] += Math.sin(t * 0.8 + i) * 0.003;
-        if (pos[i * 3 + 1] > 6) {
-          pos[i * 3 + 1] = 0.2;
-        }
-      }
-      pointsRef.current.geometry.attributes.position.needsUpdate = true;
-    }
-  });
-
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.06}
-        color="#00f0ff"
-        transparent
-        opacity={0.6}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
   );
 };
 
@@ -256,29 +261,23 @@ export const HomeArena3D: React.FC<HomeArena3DProps> = ({ parallaxX = 0, paralla
     >
       <Canvas
         shadows
-        camera={{ position: [0, 2.4, 7], fov: 44 }}
+        camera={{ position: [0, 45, 90], fov: 50 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
       >
-        {/* Fog to blend into deep dark background */}
-        <fog attach="fog" args={['#05070c', 4, 18]} />
+        <Sky sunPosition={[100, 40, 100]} inclination={0.6} azimuth={0.25} />
+        <fog attach="fog" args={['#c8d6e5', 80, 250]} />
 
-        {/* Ambient & Key Combat Stage Lighting */}
-        <ambientLight intensity={0.45} />
+        <ambientLight intensity={0.75} />
         <directionalLight
-          position={[4, 8, 4]}
+          position={[50, 80, 50]}
           intensity={1.8}
           castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
         />
 
-        {/* Player Cyan Key Rim Light */}
         <pointLight position={[-4, 2.8, 1.5]} intensity={3.5} color="#00f0ff" distance={9} />
-
-        {/* AI Opponent Crimson Key Rim Light */}
         <pointLight position={[4, 2.8, 1.5]} intensity={3.5} color="#ff0055" distance={9} />
-
-        {/* Center Arena Highlight */}
         <pointLight position={[0, 4, 0]} intensity={1.2} color="#9d4edd" distance={8} />
 
         {/* Camera Controller */}
@@ -286,8 +285,7 @@ export const HomeArena3D: React.FC<HomeArena3DProps> = ({ parallaxX = 0, paralla
 
         {/* 3D Elements */}
         <ArenaStage />
-        <CyberParticles3D />
-        <AIScanningBeam />
+        <ArenaStadium />
 
         {/* Player Fighter Silhouette (Left) */}
         <FighterSilhouette
