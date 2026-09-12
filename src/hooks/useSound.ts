@@ -14,7 +14,9 @@ export type SoundType =
   | 'attack'
   | 'dodge'
   | 'victory'
-  | 'defeat';
+  | 'defeat'
+  | 'shine'   // Fox Melee Reflector — iconic metallic Ting!
+  | 'laser';  // Arwing blaster chirp
 
 // Global audio state shared across components, persisted in localStorage
 let globalAudioMuted = false;
@@ -284,6 +286,77 @@ export const useSound = () => {
           gain.connect(ctx.destination);
           osc.start(now);
           osc.stop(now + 0.45);
+          break;
+        }
+
+        case 'shine': {
+          // Fox Melee Reflector — iconic high-pitched metallic electric "Ting!"
+          // Layered: sharp attack sine spike + metallic shimmer overtone
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const osc3 = ctx.createOscillator();
+          const g1 = ctx.createGain();
+          const g2 = ctx.createGain();
+          const g3 = ctx.createGain();
+
+          // Sharp spike — the iconic "Ting" attack transient
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(4200, now);
+          osc1.frequency.exponentialRampToValueAtTime(1800, now + 0.06);
+          g1.gain.setValueAtTime(0.22, now);
+          g1.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+          // Metallic mid overtone shimmer
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(3200, now + 0.01);
+          osc2.frequency.exponentialRampToValueAtTime(1400, now + 0.2);
+          g2.gain.setValueAtTime(0.1, now + 0.01);
+          g2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+          // Resonant tail ring
+          osc3.type = 'sine';
+          osc3.frequency.setValueAtTime(1600, now + 0.04);
+          osc3.frequency.exponentialRampToValueAtTime(800, now + 0.35);
+          g3.gain.setValueAtTime(0.06, now + 0.04);
+          g3.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+          [osc1, osc2, osc3].forEach((o, i) => {
+            const g = [g1, g2, g3][i];
+            o.connect(g);
+            g.connect(ctx.destination);
+          });
+          osc1.start(now); osc1.stop(now + 0.06);
+          osc2.start(now + 0.01); osc2.stop(now + 0.2);
+          osc3.start(now + 0.04); osc3.stop(now + 0.35);
+          break;
+        }
+
+        case 'laser': {
+          // Arwing Blaster — rising electric laser bolt chirp + muzzle flash crack
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const g1 = ctx.createGain();
+          const g2 = ctx.createGain();
+
+          // High-speed rising laser whip
+          osc1.type = 'sawtooth';
+          osc1.frequency.setValueAtTime(800, now);
+          osc1.frequency.exponentialRampToValueAtTime(3200, now + 0.045);
+          osc1.frequency.exponentialRampToValueAtTime(600, now + 0.11);
+          g1.gain.setValueAtTime(0.14, now);
+          g1.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+          // Crack / impact layer
+          osc2.type = 'square';
+          osc2.frequency.setValueAtTime(2400, now);
+          osc2.frequency.exponentialRampToValueAtTime(400, now + 0.04);
+          g2.gain.setValueAtTime(0.08, now);
+          g2.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+          osc1.connect(g1); g1.connect(ctx.destination);
+          osc2.connect(g2); g2.connect(ctx.destination);
+          osc1.start(now); osc1.stop(now + 0.11);
+          osc2.start(now); osc2.stop(now + 0.04);
           break;
         }
       }

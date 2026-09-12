@@ -17,11 +17,13 @@ import { Logo } from '../../components/common/Logo';
 import { Scanline } from '../../components/effects/Scanline';
 import { useSound } from '../../hooks/useSound';
 import { useDemoStore } from '../../demo/demoStore';
+import { useCostumeStore } from '../../store/costumeStore';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { playSound, isMuted, toggleMute } = useSound();
   const { isDemoMode, toggleDemoMode } = useDemoStore();
+  const { stageTheme, setStageTheme } = useCostumeStore();
 
   // Settings State
   const [sfxVolume, setSfxVolume] = useState<number>(85);
@@ -506,6 +508,39 @@ export const Settings: React.FC = () => {
               <span>CONFIGURATION COMMITTED TO LOCAL NEURAL MEMORY</span>
             </div>
           )}
+
+          {/* ===== STAGE THEME ===== */}
+          <div style={{ padding: '24px 28px', background: 'rgba(10,15,26,0.7)', border: '1px solid rgba(157,78,221,0.3)', borderRadius: '16px', marginBottom: '20px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--accent-violet)', letterSpacing: '0.14em', marginBottom: '6px' }}>🪐 STAGE THEME</div>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', fontWeight: 800, color: '#fff', margin: '0 0 16px' }}>ARENA ENVIRONMENT</h3>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              {([
+                { id: 'colosseum', label: '🏛️ ANCIENT COLOSSEUM', sub: 'Sunlit sandstone platform · Daytime sky · Classic tournament' },
+                { id: 'space', label: '🌌 FINAL DESTINATION', sub: 'Deep space nebula · Cosmic lighting · Glowing stage edge' },
+              ] as const).map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => { setStageTheme(theme.id); playSound('click'); }}
+                  style={{
+                    flex: '1 1 220px',
+                    padding: '14px 18px',
+                    background: stageTheme === theme.id ? 'rgba(157,78,221,0.2)' : 'rgba(255,255,255,0.04)',
+                    border: stageTheme === theme.id ? '2px solid #9d4edd' : '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '12px',
+                    color: stageTheme === theme.id ? '#fff' : '#94a3b8',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease',
+                    boxShadow: stageTheme === theme.id ? '0 0 18px rgba(157,78,221,0.35)' : 'none',
+                  }}
+                >
+                  <div style={{ fontFamily: 'var(--font-hud)', fontSize: '0.88rem', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '4px' }}>{theme.label}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', opacity: 0.7 }}>{theme.sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '28px' }}>

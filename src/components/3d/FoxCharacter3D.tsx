@@ -3,9 +3,11 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 export type FighterVariant = 'fox' | 'falco' | 'rival';
+export type FoxCostumePalette = 'classic' | 'red' | 'blue' | 'green' | 'dark';
 
 export interface FoxCharacter3DProps {
   variant?: FighterVariant;
+  costume?: FoxCostumePalette;
   isAttacking?: boolean;
   isBlocking?: boolean;
   isDodging?: boolean;
@@ -36,6 +38,49 @@ interface Palette {
   shineShield: string;
   shineWireframe: string;
 }
+
+// Fox costume colour maps — drives jacket/scarf/pants overrides
+const FOX_COSTUME_OVERRIDES: Record<FoxCostumePalette, Partial<Palette>> = {
+  classic: {},
+  red: {
+    jacket: '#dc2626',
+    jacketTrim: '#991b1b',
+    scarf: '#fbbf24',
+    pants: '#1e293b',
+    innerSuit: '#374151',
+    shineShield: '#ff6b6b',
+    shineWireframe: '#fca5a5',
+  },
+  blue: {
+    jacket: '#1d4ed8',
+    jacketTrim: '#1e3a8a',
+    scarf: '#22d3ee',
+    pants: '#1e3a5f',
+    innerSuit: '#1e40af',
+    shineShield: '#38bdf8',
+    shineWireframe: '#7dd3fc',
+  },
+  green: {
+    jacket: '#166534',
+    jacketTrim: '#14532d',
+    scarf: '#f97316',
+    pants: '#713f12',
+    innerSuit: '#15803d',
+    shineShield: '#4ade80',
+    shineWireframe: '#86efac',
+  },
+  dark: {
+    jacket: '#0f172a',
+    jacketTrim: '#1e293b',
+    scarf: '#dc2626',
+    pants: '#1e293b',
+    innerSuit: '#374151',
+    furPrimary: '#78716c',
+    furSecondary: '#57534e',
+    shineShield: '#a855f7',
+    shineWireframe: '#c084fc',
+  },
+};
 
 const PALETTES: Record<FighterVariant, Palette> = {
   fox: {
@@ -114,6 +159,7 @@ const PALETTES: Record<FighterVariant, Palette> = {
  */
 export const FoxCharacter3D: React.FC<FoxCharacter3DProps> = ({
   variant = 'fox',
+  costume = 'classic',
   isAttacking = false,
   isBlocking = false,
   isDodging = false,
@@ -121,7 +167,10 @@ export const FoxCharacter3D: React.FC<FoxCharacter3DProps> = ({
   isDead = false,
   isMoving = false,
 }) => {
-  const p = PALETTES[variant] || PALETTES.fox;
+  const basePalette = PALETTES[variant] || PALETTES.fox;
+  // Apply costume overrides only for the player fox (not falco/rival)
+  const costumeOverrides = variant === 'fox' ? (FOX_COSTUME_OVERRIDES[costume] ?? {}) : {};
+  const p: Palette = { ...basePalette, ...costumeOverrides };
 
   // Skeletal Refs for Dynamic Animations
   const rootGroupRef = useRef<THREE.Group>(null);

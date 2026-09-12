@@ -13,10 +13,7 @@ export const ArenaStadium = () => {
         <meshStandardMaterial color="#9c826b" roughness={0.7} />
       </mesh>
 
-      <mesh position={[0, 1.5, 0]}>
-        <cylinderGeometry args={[35, 35, 3, 64, 1, true]} />
-        <meshStandardMaterial color="#f0f3f8" side={THREE.DoubleSide} roughness={0.3} />
-      </mesh>
+
 
       {[0, 1, 2, 3, 4].map((tier) => {
         const innerRadius = 36 + tier * 5;

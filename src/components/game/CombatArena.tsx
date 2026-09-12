@@ -23,6 +23,7 @@ import { DodgeLockOverlay } from './DodgeLockOverlay';
 import { useVoiceCommands } from '../../hooks/useVoiceCommands';
 import { useDemoStore } from '../../demo/demoStore';
 import { DEMO_COUNTER_STRATEGY } from '../../demo/demoData';
+import { useCostumeStore } from '../../store/costumeStore';
 
 import { FoxCharacter3D } from '../3d/FoxCharacter3D';
 
@@ -68,6 +69,47 @@ const HitSpark: React.FC<HitSparkProps> = ({ position, color }) => {
 };
 
 /**
+ * Arwing Laser Bolt — animated 3D projectile fired on Special Attack
+ */
+interface LaserBoltProps {
+  from: [number, number, number];
+  to: [number, number, number];
+  color?: string;
+}
+
+const LaserBolt: React.FC<LaserBoltProps> = ({ from, to, color = '#ff4444' }) => {
+  const ref = useRef<THREE.Mesh>(null);
+  const progress = useRef(0);
+  const fromVec = new THREE.Vector3(...from);
+  const toVec = new THREE.Vector3(...to);
+  const dir = new THREE.Vector3().subVectors(toVec, fromVec);
+  const len = dir.length();
+
+  useFrame((_, delta) => {
+    if (!ref.current) return;
+    progress.current += delta * 8;
+    const t = Math.min(progress.current, 1);
+    const pos = fromVec.clone().lerp(toVec, t);
+    ref.current.position.copy(pos);
+    const mat = ref.current.material as THREE.MeshBasicMaterial;
+    mat.opacity = Math.max(0, 1 - t * 1.2);
+    ref.current.scale.setScalar(1 - t * 0.6);
+  });
+
+  // Orient capsule along direction
+  const quaternion = new THREE.Quaternion();
+  const axis = new THREE.Vector3(0, 1, 0);
+  quaternion.setFromUnitVectors(axis, dir.clone().normalize());
+
+  return (
+    <mesh ref={ref} position={from} quaternion={quaternion}>
+      <capsuleGeometry args={[0.06, len * 0.5, 4, 8]} />
+      <meshBasicMaterial color={color} transparent opacity={1} />
+    </mesh>
+  );
+};
+
+/**
  * 3D Player Fighter Component (Fox McCloud)
  */
 interface PlayerFighterProps {
@@ -77,6 +119,7 @@ interface PlayerFighterProps {
   isBlocking: boolean;
   isDodging: boolean;
   isHit: boolean;
+  costume?: import('../../store/costumeStore').FoxCostume;
   onPositionUpdate: (pos: [number, number, number], isMoving: boolean) => void;
 }
 
@@ -87,6 +130,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
   isBlocking,
   isDodging,
   isHit,
+  costume,
   onPositionUpdate,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
@@ -160,6 +204,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
     <group ref={groupRef} position={[-2.2, 0.2, 0]}>
       <FoxCharacter3D
         variant="fox"
+        costume={costume}
         isAttacking={isAttacking}
         isBlocking={isBlocking}
         isDodging={isDodging}
@@ -489,6 +534,8 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const comboResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastDamageEvent, setLastDamageEvent] = useState<{ text: string; isCrit?: boolean; id: number } | null>(null);
   const [hitSparks, setHitSparks] = useState<{ id: number; pos: [number, number, number]; color: string }[]>([]);
+  // Arwing Laser Bolts on Special
+  const [laserBolts, setLaserBolts] = useState<{ id: number; from: [number, number, number]; to: [number, number, number]; color: string }[]>([]);
 
   // End of match
   const isVictory = enemyHp <= 0;
@@ -515,6 +562,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       return null;
     }
   }, []);
+
+  // Costume & Stage Theme
+  const { selectedCostume, stageTheme } = useCostumeStore();
 
   // Demo Mode Store State
   const {
@@ -817,8 +867,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
 
   // Trigger Player Block
   const triggerPlayerBlockStart = () => {
-    if (isPlayerDodging || isVictory || isDefeat) return;
+    if (isVictory || isDefeat) return;
     setIsPlayerBlocking(true);
+    playSound('shine'); // Iconic Fox Melee Reflector Shine chime
     telemetryCollectorRef.current.recordBlock({
       playerHp,
       enemyHp,
@@ -895,13 +946,28 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     if (isPlayerAttacking || isPlayerDodging || isVictory || isDefeat) return;
 
     setIsPlayerAttacking(true);
+    playSound('laser'); // Arwing Blaster chirp
     playSound('granted');
 
+    const from: [number, number, number] = [
+      playerPosRef.current.x,
+      playerPosRef.current.y + 1.0,
+      playerPosRef.current.z,
+    ];
+    const to: [number, number, number] = [
+      enemyPosRef.current.x,
+      enemyPosRef.current.y + 1.0,
+      enemyPosRef.current.z,
+    ];
+    const boltId = Date.now();
+    setLaserBolts((prev) => [...prev.slice(-5), { id: boltId, from, to, color: '#ff3333' }]);
+    setTimeout(() => setLaserBolts((prev) => prev.filter((b) => b.id !== boltId)), 600);
+
     const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
-    const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
-    const hitZ = (playerPosRef.current.z + enemyPosRef.current.z) / 2;
 
     // Multi-color elemental explosion sparks
+    const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
+    const hitZ = (playerPosRef.current.z + enemyPosRef.current.z) / 2;
     setHitSparks((prev) => [
       ...prev.slice(-4),
       { id: Date.now(), pos: [hitX, 1.3, hitZ], color: '#ffaa00' },
@@ -1110,26 +1176,32 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         camera={{ position: [0, 3.8, 7.2], fov: 45 }}
         style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
       >
-        {/* Daytime Sky & Natural Horizon Atmosphere */}
-        <Sky sunPosition={[100, 45, 100]} inclination={0.6} azimuth={0.25} turbidity={8} rayleigh={1.2} />
-        <fog attach="fog" args={['#c8d6e5', 50, 190]} />
+        {/* Sky & Atmosphere — switches by stage theme */}
+        {stageTheme === 'space' ? (
+          <>
+            <color attach="background" args={['#020408']} />
+            <fog attach="fog" args={['#020408', 60, 220]} />
+            <ambientLight intensity={0.2} color="#3b5bdb" />
+            <hemisphereLight groundColor="#0f172a" color="#7c3aed" intensity={0.5} />
+            <directionalLight position={[40, 60, 40]} intensity={1.8} color="#a5f3fc" castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+            <directionalLight position={[-20, 25, -20]} intensity={0.8} color="#818cf8" />
+            <pointLight position={[0, 8, 0]} intensity={3} color="#7c3aed" distance={20} />
+          </>
+        ) : (
+          <>
+            <Sky sunPosition={[100, 45, 100]} inclination={0.6} azimuth={0.25} turbidity={8} rayleigh={1.2} />
+            <fog attach="fog" args={['#c8d6e5', 50, 190]} />
+            <ambientLight intensity={0.9} color="#ffffff" />
+            <hemisphereLight groundColor="#d4b28c" color="#dbeafe" intensity={0.7} />
+            <directionalLight position={[40, 60, 40]} intensity={2.2} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+            <directionalLight position={[-20, 25, -20]} intensity={0.6} color="#fef3c7" />
+          </>
+        )}
 
         {/* Dodge Lock Manager Game Loop Tick */}
         <ArenaGameLoop onUpdate={(delta) => dodgeLockManagerRef.current.update(delta)} />
 
-        {/* Daytime Lighting */}
-        <ambientLight intensity={0.9} color="#ffffff" />
-        <hemisphereLight groundColor="#d4b28c" color="#dbeafe" intensity={0.7} />
-        <directionalLight
-          position={[40, 60, 40]}
-          intensity={2.2}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-        />
-        <directionalLight position={[-20, 25, -20]} intensity={0.6} color="#fef3c7" />
-
-        {/* Floating Sunlit Atmosphere Dust */}
+        {/* Floating Sunlit Atmospheric Dust */}
         <SunParticles3D />
 
         {/* Arena Stage */}
@@ -1138,6 +1210,11 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         {/* Dynamic Hit Sparks */}
         {hitSparks.map((spark) => (
           <HitSpark key={spark.id} position={spark.pos} color={spark.color} />
+        ))}
+
+        {/* Arwing Laser Bolts */}
+        {laserBolts.map((bolt) => (
+          <LaserBolt key={bolt.id} from={bolt.from} to={bolt.to} color={bolt.color} />
         ))}
 
         {/* Camera Follow */}
@@ -1151,6 +1228,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           isBlocking={isPlayerBlocking}
           isDodging={isPlayerDodging}
           isHit={isPlayerHit}
+          costume={selectedCostume}
           onPositionUpdate={(pos, isMoving) => handlePlayerPositionUpdate(pos, isMoving)}
         />
 

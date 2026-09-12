@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useSound } from '../../hooks/useSound';
 import { CameraWeaponScanner } from '../../components/scanner/CameraWeaponScanner';
 import type { ScannedWeaponResult } from '../../services/api';
+import { useCostumeStore, FOX_COSTUMES } from '../../store/costumeStore';
 import {
   Swords,
   ArrowLeft,
@@ -20,6 +21,7 @@ export const PreFight: React.FC = () => {
   const navigate = useNavigate();
   const { player } = useAuth();
   const { playSound } = useSound();
+  const { selectedCostume, setCostume } = useCostumeStore();
 
   // Weapon Loadout state (Defaults to Tome of Wisdom from Book scan)
   const [selectedWeapon, setSelectedWeapon] = useState<string>('TOME OF WISDOM');
@@ -381,8 +383,44 @@ export const PreFight: React.FC = () => {
                   ({detectedItem} detected)
                 </span>
               </div>
+              {/* Fox Color Costume Switcher */}
+              <div style={{ borderTop: '1px solid rgba(0,240,255,0.15)', paddingTop: '14px', marginTop: '4px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-muted)', letterSpacing: '0.12em', marginBottom: '10px' }}>
+                  FOX COLORS // MELEE PALETTE
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {FOX_COSTUMES.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      title={`${c.label}: ${c.subtitle}`}
+                      onClick={() => { setCostume(c.id); playSound('click'); }}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: c.swatchColor,
+                        border: selectedCostume === c.id
+                          ? '3px solid #00f0ff'
+                          : '2px solid rgba(255,255,255,0.2)',
+                        boxShadow: selectedCostume === c.id
+                          ? `0 0 14px ${c.swatchColor}, 0 0 5px #00f0ff`
+                          : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.18s ease',
+                        transform: selectedCostume === c.id ? 'scale(1.2)' : 'scale(1)',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.64rem', color: 'var(--accent-cyan)', marginTop: '6px', letterSpacing: '0.08em' }}>
+                  {FOX_COSTUMES.find(c => c.id === selectedCostume)?.label ?? 'CLASSIC WHITE'}
+                </div>
+              </div>
             </div>
           </div>
+
 
           {/* ================= VS CENTER PILLAR ================= */}
           <div
@@ -486,7 +524,7 @@ export const PreFight: React.FC = () => {
                   letterSpacing: '0.04em',
                 }}
               >
-                NEXUS AI // ARCHON
+                AI RIVAL // FALCO LOMBARDI
               </h2>
               <div
                 style={{
@@ -496,7 +534,7 @@ export const PreFight: React.FC = () => {
                   marginTop: '2px',
                 }}
               >
-                PERSONALITY: RUTHLESS STRATEGIST // ADAPTIVE
+                PERSONALITY: ACE PILOT // RAPID AERIAL COUNTER
               </div>
             </div>
 
@@ -535,7 +573,7 @@ export const PreFight: React.FC = () => {
                 PREDATORY COUNTER-STRIKE
               </div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                Detects repeated player jabs and automatically calibrates parry timing.
+                Reads approach patterns mid-flight. Rapid Phantasm burst, laser volley, and Reflector counter-spike automatically chain on repeated jab strings.
               </div>
             </div>
           </div>
