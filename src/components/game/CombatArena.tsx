@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { CombatHUD } from './CombatHUD';
 import { useKeyboardControls } from '../../hooks/useKeyboardControls';
 import { useSound } from '../../hooks/useSound';
+import { AIController } from '../../game/AI/AIController';
+import type { AIStateType } from '../../game/AI/AIState';
 
 const ARENA_RADIUS = 6.2;
 const MOVEMENT_SPEED = 5.2;
@@ -41,7 +43,7 @@ const HitSpark: React.FC<HitSparkProps> = ({ position, color }) => {
 };
 
 /**
- * 3D Player Fighter Component with WASD Movement, Attack, Block, Dodge, and Hit animations
+ * 3D Player Fighter Component
  */
 interface PlayerFighterProps {
   position: React.MutableRefObject<THREE.Vector3>;
@@ -70,7 +72,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
     if (!groupRef.current) return;
 
     if (isDead) {
-      // Death collapse animation: fall backward to the ground
+      // Death collapse
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -Math.PI / 2, delta * 6);
       groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0.25, delta * 6);
       return;
@@ -89,7 +91,6 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       position.current.x += moveDir.x * moveStep;
       position.current.z += moveDir.y * moveStep;
 
-      // Rotate towards movement
       targetRotation.current = Math.atan2(moveDir.x, moveDir.y);
     }
 
@@ -111,32 +112,26 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
     // 4. Combat Animations & Poses
     const t = state.clock.getElapsedTime();
     if (isAttacking) {
-      // Attack lunge: lean forward and lunge
       groupRef.current.rotation.x = 0.35;
       groupRef.current.scale.set(1.15, 0.95, 1.25);
     } else if (isDodging) {
-      // Dodge roll/dash: low profile roll
       groupRef.current.rotation.x = 0.5;
       groupRef.current.scale.set(0.9, 0.7, 0.9);
       position.current.y = 0.05;
     } else if (isBlocking) {
-      // Guard stance: defensive crouch
       groupRef.current.rotation.x = -0.15;
       groupRef.current.scale.set(1, 0.9, 1);
       position.current.y = 0.15;
     } else if (isMoving) {
-      // Running stride
       position.current.y = 0.2 + Math.abs(Math.sin(t * 12)) * 0.08;
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0.15, delta * 10);
       groupRef.current.scale.set(1, 1, 1);
     } else {
-      // Idle combat stance breathing
       position.current.y = 0.2 + Math.sin(t * 3) * 0.05;
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, delta * 10);
       groupRef.current.scale.set(1, 1, 1);
     }
 
-    // Apply translation
     groupRef.current.position.copy(position.current);
     onPositionUpdate([position.current.x, position.current.y, position.current.z], isMoving);
   });
@@ -218,24 +213,30 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
 };
 
 /**
- * 3D Enemy AI Fighter with Attack, Block, Dodge, and Death animations
+ * 3D Enemy AI Fighter Component with Finite State Machine Updates
  */
 interface EnemyFighterProps {
   position: React.MutableRefObject<THREE.Vector3>;
   playerPosition: [number, number, number];
   isDead: boolean;
-  isAttacking: boolean;
-  isBlocking: boolean;
   isHit: boolean;
+  aiControllerRef: React.MutableRefObject<AIController>;
+  enemyHp: number;
+  playerHp: number;
+  isPlayerAttacking: boolean;
+  isPlayerBlocking: boolean;
 }
 
 const EnemyFighter: React.FC<EnemyFighterProps> = ({
   position,
   playerPosition,
   isDead,
-  isAttacking,
-  isBlocking,
   isHit,
+  aiControllerRef,
+  enemyHp,
+  playerHp,
+  isPlayerAttacking,
+  isPlayerBlocking,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -243,13 +244,26 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
     if (!groupRef.current) return;
 
     if (isDead) {
-      // Enemy death fall: collapse backward onto the stage
+      // Enemy death fall
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, Math.PI / 2, delta * 6);
       groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0.25, delta * 6);
       return;
     }
 
-    // Turn toward player
+    // 1. Update AI Controller (Finite State Machine Decision & Movement Tick)
+    const playerVec = new THREE.Vector3(...playerPosition);
+    aiControllerRef.current.update(delta, position.current, playerVec, {
+      enemyHp,
+      enemyMaxHp: ENEMY_MAX_HP,
+      playerHp,
+      isPlayerAttacking,
+      isPlayerBlocking,
+      arenaRadius: ARENA_RADIUS,
+    });
+
+    const aiState = aiControllerRef.current.getState();
+
+    // 2. Turn smoothly toward the player
     const angleToPlayer = Math.atan2(
       playerPosition[0] - position.current.x,
       playerPosition[2] - position.current.z
@@ -261,18 +275,19 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
       delta * 5
     );
 
-    // Combat animations
+    // 3. Pose & Animation based on AI FSM State
     const t = state.clock.getElapsedTime();
-    if (isAttacking) {
-      // Attack strike lunge
+    if (aiState === 'ATTACK') {
       groupRef.current.rotation.x = 0.35;
       groupRef.current.scale.set(1.2, 1, 1.25);
-    } else if (isBlocking) {
-      // Defensive guard
+    } else if (aiState === 'BLOCK') {
       groupRef.current.rotation.x = -0.15;
       groupRef.current.scale.set(1, 0.9, 1);
+    } else if (aiState === 'DODGE' || aiState === 'RETREAT') {
+      groupRef.current.rotation.x = -0.2;
+      groupRef.current.scale.set(0.95, 0.9, 0.95);
     } else {
-      // Idle breathing
+      // Idle / Approach breathing
       position.current.y = 0.2 + Math.sin(t * 2.8 + 1.2) * 0.05;
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, delta * 8);
       groupRef.current.scale.set(1, 1, 1);
@@ -280,6 +295,9 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
 
     groupRef.current.position.copy(position.current);
   });
+
+  const isBlocking = aiControllerRef.current.isBlocking();
+  const isAttacking = aiControllerRef.current.isAttacking();
 
   return (
     <group ref={groupRef} position={[2.5, 0.2, 0]}>
@@ -455,7 +473,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const navigate = useNavigate();
   const { playSound } = useSound();
 
-  // Positions (Refs for 60 FPS physics & game loop)
+  // Positions
   const playerPosRef = useRef(new THREE.Vector3(-2.2, 0.2, 0));
   const enemyPosRef = useRef(new THREE.Vector3(2.5, 0.2, 0));
   const [playerCoordinates, setPlayerCoordinates] = useState<[number, number, number]>([-2.2, 0.2, 0]);
@@ -464,15 +482,15 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const [playerHp, setPlayerHp] = useState<number>(PLAYER_MAX_HP);
   const [enemyHp, setEnemyHp] = useState<number>(ENEMY_MAX_HP);
 
-  // States
+  // Player States
   const [isPlayerAttacking, setIsPlayerAttacking] = useState(false);
   const [isPlayerBlocking, setIsPlayerBlocking] = useState(false);
   const [isPlayerDodging, setIsPlayerDodging] = useState(false);
   const [isPlayerHit, setIsPlayerHit] = useState(false);
 
-  const [isEnemyAttacking, setIsEnemyAttacking] = useState(false);
-  const [isEnemyBlocking, setIsEnemyBlocking] = useState(false);
+  // Enemy Hit Feedback & FSM State
   const [isEnemyHit, setIsEnemyHit] = useState(false);
+  const [aiCurrentState, setAiCurrentState] = useState<AIStateType>('IDLE');
 
   // Combo & Damage feedback
   const [comboCount, setComboCount] = useState(0);
@@ -484,37 +502,73 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const isVictory = enemyHp <= 0;
   const isDefeat = playerHp <= 0;
 
-  // Trigger attack
+  // AI Controller Ref
+  const aiControllerRef = useRef<AIController>(
+    new AIController({
+      onAttackTrigger: () => {
+        handleAIAttackStrike();
+      },
+      onStateChange: (newState) => {
+        setAiCurrentState(newState);
+      },
+    })
+  );
+
+  // Enemy Attack Execution Handler
+  const handleAIAttackStrike = () => {
+    if (isVictory || isDefeat) return;
+
+    playSound('pulse');
+
+    setTimeout(() => {
+      const currentDist = playerPosRef.current.distanceTo(enemyPosRef.current);
+      if (currentDist <= ATTACK_RANGE && !isVictory && !isDefeat) {
+        if (isPlayerDodging) {
+          setLastDamageEvent({ text: 'AI ATTACK DODGED!', isCrit: false, id: Date.now() });
+        } else if (isPlayerBlocking) {
+          const dmg = 4;
+          setPlayerHp(hp => Math.max(0, hp - dmg));
+          playSound('scan');
+          setLastDamageEvent({ text: `BLOCKED ENEMY! -${dmg} HP`, isCrit: false, id: Date.now() });
+        } else {
+          const dmg = 14;
+          setPlayerHp(hp => Math.max(0, hp - dmg));
+          setIsPlayerHit(true);
+          playSound('denied');
+          setLastDamageEvent({ text: `ENEMY STRIKE! -${dmg} HP`, isCrit: true, id: Date.now() });
+          setTimeout(() => setIsPlayerHit(false), 200);
+        }
+      }
+    }, 200);
+  };
+
+  // Trigger Player Attack
   const triggerPlayerAttack = () => {
     if (isPlayerAttacking || isPlayerDodging || isVictory || isDefeat) return;
 
     setIsPlayerAttacking(true);
     playSound('pulse');
 
-    // Check distance between player and enemy
     const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
 
     setTimeout(() => {
       if (dist <= ATTACK_RANGE && !isVictory && !isDefeat) {
-        // Attack hit!
         const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
         const hitZ = (playerPosRef.current.z + enemyPosRef.current.z) / 2;
 
-        // Spawn hit spark
         setHitSparks(prev => [...prev, { id: Date.now(), pos: [hitX, 1.1, hitZ], color: '#00f0ff' }]);
 
-        if (isEnemyBlocking) {
-          // Blocked damage
+        const isEnemyCurrentlyBlocking = aiControllerRef.current.isBlocking();
+
+        if (isEnemyCurrentlyBlocking) {
           const dmg = 5;
           setEnemyHp(hp => Math.max(0, hp - dmg));
           playSound('scan');
-          setLastDamageEvent({ text: `BLOCKED! -${dmg} HP`, isCrit: false, id: Date.now() });
+          setLastDamageEvent({ text: `AI BLOCKED! -${dmg} HP`, isCrit: false, id: Date.now() });
         } else {
-          // Clean hit
           const newCombo = comboCount + 1;
           setComboCount(newCombo);
 
-          // Crit on 3rd combo hit!
           const isCrit = newCombo >= 3;
           const dmg = isCrit ? 26 : 16;
 
@@ -530,28 +584,25 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
 
           setTimeout(() => setIsEnemyHit(false), 200);
 
-          // Reset combo after 2 seconds of inactivity
           if (comboResetTimer.current) clearTimeout(comboResetTimer.current);
           comboResetTimer.current = setTimeout(() => {
             setComboCount(0);
           }, 2000);
         }
       } else {
-        // Whiffed / Missed
         setComboCount(0);
       }
       setIsPlayerAttacking(false);
     }, 220);
   };
 
-  // Trigger Dodge
+  // Trigger Player Dodge
   const triggerPlayerDodge = () => {
     if (isPlayerDodging || isPlayerAttacking || isVictory || isDefeat) return;
 
     setIsPlayerDodging(true);
     playSound('scan');
 
-    // Quick evasive slip backward or away from enemy
     const awayDir = new THREE.Vector3()
       .subVectors(playerPosRef.current, enemyPosRef.current)
       .normalize();
@@ -593,62 +644,6 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     };
   }, [isVictory, isDefeat, isPlayerAttacking, isPlayerDodging, comboCount]);
 
-  // Enemy Combat Loop (Periodic attack/defense)
-  useEffect(() => {
-    if (isVictory || isDefeat) return;
-
-    const aiInterval = setInterval(() => {
-      if (isVictory || isDefeat) return;
-
-      const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
-
-      if (dist <= ATTACK_RANGE) {
-        // 70% chance to attack, 30% chance to block
-        const action = Math.random() > 0.3 ? 'ATTACK' : 'BLOCK';
-
-        if (action === 'ATTACK') {
-          setIsEnemyAttacking(true);
-          playSound('pulse');
-
-          setTimeout(() => {
-            const currentDist = playerPosRef.current.distanceTo(enemyPosRef.current);
-            if (currentDist <= ATTACK_RANGE && !isVictory && !isDefeat) {
-              if (isPlayerDodging) {
-                setLastDamageEvent({ text: 'AI ATTACK DODGED!', isCrit: false, id: Date.now() });
-              } else if (isPlayerBlocking) {
-                const dmg = 4;
-                setPlayerHp(hp => Math.max(0, hp - dmg));
-                playSound('scan');
-                setLastDamageEvent({ text: `BLOCKED ENEMY! -${dmg} HP`, isCrit: false, id: Date.now() });
-              } else {
-                const dmg = 14;
-                setPlayerHp(hp => Math.max(0, hp - dmg));
-                setIsPlayerHit(true);
-                playSound('denied');
-                setLastDamageEvent({ text: `ENEMY STRIKE! -${dmg} HP`, isCrit: true, id: Date.now() });
-                setTimeout(() => setIsPlayerHit(false), 200);
-              }
-            }
-            setIsEnemyAttacking(false);
-          }, 240);
-        } else {
-          // AI raises block for 800ms
-          setIsEnemyBlocking(true);
-          setTimeout(() => setIsEnemyBlocking(false), 800);
-        }
-      } else {
-        // If player is far away, enemy slowly stalks closer
-        const towardPlayer = new THREE.Vector3()
-          .subVectors(playerPosRef.current, enemyPosRef.current)
-          .normalize();
-        enemyPosRef.current.x += towardPlayer.x * 0.45;
-        enemyPosRef.current.z += towardPlayer.z * 0.45;
-      }
-    }, 1600);
-
-    return () => clearInterval(aiInterval);
-  }, [isVictory, isDefeat, isPlayerDodging, isPlayerBlocking]);
-
   // Victory Confetti
   useEffect(() => {
     if (isVictory) {
@@ -675,14 +670,12 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     setLastDamageEvent(null);
     playerPosRef.current.set(-2.2, 0.2, 0);
     enemyPosRef.current.set(2.5, 0.2, 0);
+    aiControllerRef.current.reset();
     setIsPlayerAttacking(false);
     setIsPlayerBlocking(false);
     setIsPlayerDodging(false);
-    setIsEnemyAttacking(false);
-    setIsEnemyBlocking(false);
   };
 
-  // Determine state labels for HUD badges
   const playerStateBadge = isPlayerDodging
     ? 'DODGING'
     : isPlayerBlocking
@@ -690,14 +683,6 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     : isPlayerAttacking
     ? 'ATTACKING'
     : isPlayerHit
-    ? 'HIT'
-    : 'NORMAL';
-
-  const enemyStateBadge = isEnemyBlocking
-    ? 'BLOCKING'
-    : isEnemyAttacking
-    ? 'ATTACKING'
-    : isEnemyHit
     ? 'HIT'
     : 'NORMAL';
 
@@ -712,7 +697,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         userSelect: 'none',
       }}
     >
-      {/* 2D Combat HUD with Health Bars, Combo Counter, and Overlays */}
+      {/* 2D Combat HUD */}
       <CombatHUD
         playerHp={playerHp}
         playerMaxHp={PLAYER_MAX_HP}
@@ -720,7 +705,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         playerState={playerStateBadge}
         enemyHp={enemyHp}
         enemyMaxHp={ENEMY_MAX_HP}
-        enemyState={enemyStateBadge}
+        enemyState={isVictory ? 'DEFEATED' : aiCurrentState}
         comboCount={comboCount}
         lastDamageEvent={lastDamageEvent}
         isVictory={isVictory}
@@ -736,7 +721,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         onDodgePress={triggerPlayerDodge}
       />
 
-      {/* 3D Canvas (React Three Fiber) */}
+      {/* 3D Canvas */}
       <Canvas
         shadows
         camera={{ position: [0, 3.8, 7.2], fov: 45 }}
@@ -769,7 +754,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         {/* Camera Follow */}
         <FollowCamera playerPosition={playerCoordinates} />
 
-        {/* Player Fighter (WASD + J, K, SPACE) */}
+        {/* Player Fighter */}
         <PlayerFighter
           position={playerPosRef}
           isDead={isDefeat}
@@ -780,14 +765,17 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           onPositionUpdate={(pos) => setPlayerCoordinates(pos)}
         />
 
-        {/* Enemy Fighter (AI Opponent) */}
+        {/* Enemy Fighter (AI Opponent using FSM) */}
         <EnemyFighter
           position={enemyPosRef}
           playerPosition={playerCoordinates}
           isDead={isVictory}
-          isAttacking={isEnemyAttacking}
-          isBlocking={isEnemyBlocking}
           isHit={isEnemyHit}
+          aiControllerRef={aiControllerRef}
+          enemyHp={enemyHp}
+          playerHp={playerHp}
+          isPlayerAttacking={isPlayerAttacking}
+          isPlayerBlocking={isPlayerBlocking}
         />
       </Canvas>
     </div>
