@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Volume2, VolumeX } from 'lucide-react';
 import { useSound } from '../hooks/useSound';
 import { DemoControllerBar } from '../demo/DemoControllerBar';
+import { GlobalVoiceControl } from '../components/voice/GlobalVoiceControl';
 
 interface GameLayoutProps {
   children: React.ReactNode;
@@ -43,6 +44,9 @@ export const GameLayout: React.FC<GameLayoutProps> = ({ children }) => {
     >
       {/* Hackathon Demo Controller Bar (Active only when Demo Mode is enabled) */}
       <DemoControllerBar />
+
+      {/* Global Groq Whisper Voice Controller (Accessible across all pages) */}
+      <GlobalVoiceControl />
 
       {/* Top Cyber Sweep Beam on Page Transitions */}
       {sweepActive && <div className="cyber-route-sweep" />}

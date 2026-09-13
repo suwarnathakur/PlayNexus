@@ -1315,6 +1315,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
 
     // Melee / Fox McCloud: Close-Range Strike
     setIsPlayerAttacking(true);
+    playSound('attack');
     playSound('pulse');
 
     // Record attack input telemetry
@@ -1366,7 +1367,11 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
 
           setEnemyHp(nextEnemyHp);
           setIsEnemyHit(true);
-          playSound('granted');
+          if (isCrit) {
+            playSound('combo_burst');
+          } else {
+            playSound('granted');
+          }
 
           const weaponTag = equippedWeapon ? ` [${equippedWeapon.weapon.toUpperCase()}]` : '';
           setLastDamageEvent({
@@ -1423,7 +1428,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     if (isPlayerDodging || isPlayerAttacking || isVictory || isDefeat) return;
 
     setIsPlayerDodging(true);
-    playSound('scan');
+    playSound('dodge');
 
     // Directional recognition based on active keys & relative position
     let direction: DodgeDirection = 'neutral';
@@ -1611,7 +1616,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     }, 450);
   };
 
-  // Web Speech API Voice Commands Integration (Attack, Block, Dodge, Special)
+  // Groq Whisper & Web Speech API Voice Commands Integration (Attack, Block, Dodge, Special, Rematch)
   const voiceCommands = useVoiceCommands({
     onAttack: triggerPlayerAttack,
     onBlock: () => {
@@ -1620,7 +1625,33 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     },
     onDodge: triggerPlayerDodge,
     onSpecial: triggerPlayerSpecial,
+    onRestart: () => handleRestartMatch(),
   });
+
+  // Listen to Global Voice Commands dispatched from Floating Mic
+  useEffect(() => {
+    const handleGlobalVoiceCommand = (e: Event) => {
+      const customEvent = e as CustomEvent<{ command: string }>;
+      const cmd = customEvent.detail?.command;
+      if (!cmd || isVictory || isDefeat) return;
+
+      if (cmd === 'ATTACK') {
+        triggerPlayerAttack();
+      } else if (cmd === 'BLOCK') {
+        triggerPlayerBlockStart();
+        setTimeout(() => setIsPlayerBlocking(false), 900);
+      } else if (cmd === 'DODGE') {
+        triggerPlayerDodge();
+      } else if (cmd === 'SPECIAL') {
+        triggerPlayerSpecial();
+      } else if (cmd === 'RESTART_MATCH') {
+        handleRestartMatch();
+      }
+    };
+
+    window.addEventListener('playnexus_voice_command', handleGlobalVoiceCommand);
+    return () => window.removeEventListener('playnexus_voice_command', handleGlobalVoiceCommand);
+  }, [isVictory, isDefeat]);
 
   // Keyboard action event listener
   useEffect(() => {
@@ -1653,9 +1684,10 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     };
   }, [isVictory, isDefeat, isPlayerAttacking, isPlayerDodging, comboCount]);
 
-  // Victory Confetti
+  // Victory Confetti & Defeat Audio
   useEffect(() => {
     if (isVictory) {
+      playSound('victory');
       playSound('granted');
       try {
         confetti({
@@ -1666,12 +1698,14 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         });
       } catch {}
     } else if (isDefeat) {
+      playSound('defeat');
       playSound('denied');
     }
   }, [isVictory, isDefeat, playSound]);
 
   // Restart Match Handler
   const handleRestartMatch = () => {
+    playSound('transition');
     playSound('granted');
     setPlayerHp(PLAYER_MAX_HP);
     setEnemyHp(ENEMY_MAX_HP);

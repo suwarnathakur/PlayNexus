@@ -1,72 +1,223 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  transcribeAudioWithGroq,
+  hasGroqApiKey,
+  getGroqApiKey,
+} from '../services/groqWhisperService';
+import { useSound } from './useSound';
 
 export interface VoiceCommandHandlers {
   onAttack?: () => void;
   onBlock?: () => void;
   onDodge?: () => void;
   onSpecial?: () => void;
+  onRestart?: () => void;
+  onNavigate?: (path: string) => void;
+  onMuteToggle?: () => void;
+  onStyleSelect?: (style: 'melee' | 'archery') => void;
+  onCostumeSelect?: (costume: string) => void;
 }
 
 export interface UseVoiceCommandsResult {
   isSupported: boolean;
   isListening: boolean;
+  isTranscribing: boolean;
+  engine: 'groq' | 'webspeech';
   lastCommand: string | null;
   recognizedText: string | null;
   error: string | null;
+  hasGroqKey: boolean;
   startListening: () => void;
   stopListening: () => void;
   toggleListening: () => void;
+  processTranscript: (text: string) => string | null;
 }
 
-export function useVoiceCommands(handlers: VoiceCommandHandlers): UseVoiceCommandsResult {
+export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceCommandsResult {
+  const { playSound } = useSound();
   const [isSupported, setIsSupported] = useState<boolean>(true);
   const [isListening, setIsListening] = useState<boolean>(false);
+  const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
+  const [engine, setEngine] = useState<'groq' | 'webspeech'>('groq');
   const [lastCommand, setLastCommand] = useState<string | null>(null);
   const [recognizedText, setRecognizedText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Groq MediaRecorder state
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Web Speech Fallback state
   const recognitionRef = useRef<any>(null);
+
   const isListeningRef = useRef<boolean>(false);
   const clearCommandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlersRef = useRef<VoiceCommandHandlers>(handlers);
 
-  // Keep latest handlers ref without re-attaching listeners
   useEffect(() => {
     handlersRef.current = handlers;
   }, [handlers]);
 
-  const processTranscript = useCallback((rawTranscript: string) => {
+  const hasKey = hasGroqApiKey();
+
+  // Check hardware / browser support
+  useEffect(() => {
+    const hasMedia = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+    const hasSpeech =
+      typeof window !== 'undefined' &&
+      (!!(window as any).SpeechRecognition || !!(window as any).webkitSpeechRecognition);
+    setIsSupported(hasMedia || hasSpeech);
+    setEngine(hasGroqApiKey() ? 'groq' : 'webspeech');
+  }, []);
+
+  /**
+   * Process raw text from either Groq Whisper or Web Speech
+   */
+  const processTranscript = useCallback((rawTranscript: string): string | null => {
     const text = rawTranscript.trim().toLowerCase();
+    if (!text) return null;
+
     setRecognizedText(text);
 
     let detected: string | null = null;
+    let targetPath: string | null = null;
 
-    if (text.includes('attack') || text.includes('strike') || text.includes('punch') || text.includes('hit')) {
+    // 1. Combat Commands
+    if (text.includes('attack') || text.includes('strike') || text.includes('punch') || text.includes('hit') || text.includes('shoot')) {
       detected = 'ATTACK';
       handlersRef.current.onAttack?.();
-    } else if (text.includes('block') || text.includes('guard') || text.includes('shield') || text.includes('defend')) {
+    } else if (text.includes('block') || text.includes('guard') || text.includes('shield') || text.includes('defend') || text.includes('reflector') || text.includes('shine')) {
       detected = 'BLOCK';
       handlersRef.current.onBlock?.();
-    } else if (text.includes('dodge') || text.includes('dash') || text.includes('evade') || text.includes('roll')) {
+    } else if (text.includes('dodge') || text.includes('dash') || text.includes('evade') || text.includes('roll') || text.includes('slide')) {
       detected = 'DODGE';
       handlersRef.current.onDodge?.();
-    } else if (text.includes('special') || text.includes('ultimate') || text.includes('ability') || text.includes('super') || text.includes('power')) {
+    } else if (text.includes('special') || text.includes('ultimate') || text.includes('blaster') || text.includes('laser') || text.includes('volley') || text.includes('super')) {
       detected = 'SPECIAL';
       handlersRef.current.onSpecial?.();
+    } else if (text.includes('restart') || text.includes('rematch') || text.includes('retry') || text.includes('reset')) {
+      detected = 'RESTART_MATCH';
+      handlersRef.current.onRestart?.();
+    }
+
+    // 2. Global Navigation Commands
+    else if (text.includes('character') || text.includes('fighter') || text.includes('select character')) {
+      detected = 'NAVIGATE_CHARACTER_SELECT';
+      targetPath = '/character-select';
+    } else if (text.includes('arena') || text.includes('battle') || text.includes('combat') || text.includes('start fight') || text.includes('play')) {
+      detected = 'NAVIGATE_ARENA';
+      targetPath = '/arena';
+    } else if (text.includes('pre-fight') || text.includes('prefight') || text.includes('lobby')) {
+      detected = 'NAVIGATE_PREFIGHT';
+      targetPath = '/pre-fight';
+    } else if (text.includes('leaderboard') || text.includes('ranking') || text.includes('top players')) {
+      detected = 'NAVIGATE_LEADERBOARD';
+      targetPath = '/leaderboard';
+    } else if (text.includes('analysis') || text.includes('telemetry') || text.includes('stats') || text.includes('metrics')) {
+      detected = 'NAVIGATE_ANALYSIS';
+      targetPath = '/analysis';
+    } else if (text.includes('setting') || text.includes('config') || text.includes('option')) {
+      detected = 'NAVIGATE_SETTINGS';
+      targetPath = '/settings';
+    } else if (text.includes('home') || text.includes('menu') || text.includes('main menu')) {
+      detected = 'NAVIGATE_HOME';
+      targetPath = '/';
+    } else if (text.includes('login') || text.includes('sign in')) {
+      detected = 'NAVIGATE_LOGIN';
+      targetPath = '/login';
+    } else if (text.includes('register') || text.includes('sign up')) {
+      detected = 'NAVIGATE_REGISTER';
+      targetPath = '/register';
+    }
+
+    // 3. Audio Commands
+    else if (text.includes('unmute') || text.includes('sound on') || text.includes('audio on')) {
+      detected = 'UNMUTE_AUDIO';
+      handlersRef.current.onMuteToggle?.();
+    } else if (text.includes('mute') || text.includes('silence') || text.includes('sound off') || text.includes('audio off')) {
+      detected = 'MUTE_AUDIO';
+      handlersRef.current.onMuteToggle?.();
+    }
+
+    // 4. Combat Style & Costume Selection
+    else if (text.includes('archery') || text.includes('archer') || text.includes('bow')) {
+      detected = 'STYLE_ARCHERY';
+      handlersRef.current.onStyleSelect?.('archery');
+    } else if (text.includes('melee') || text.includes('striker') || text.includes('fox')) {
+      detected = 'STYLE_MELEE';
+      handlersRef.current.onStyleSelect?.('melee');
+    } else if (text.includes('classic') || text.includes('white fox')) {
+      detected = 'COSTUME_CLASSIC';
+      handlersRef.current.onCostumeSelect?.('classic');
+    } else if (text.includes('crimson') || text.includes('red fox')) {
+      detected = 'COSTUME_RED';
+      handlersRef.current.onCostumeSelect?.('red');
+    } else if (text.includes('sector z') || text.includes('blue fox')) {
+      detected = 'COSTUME_BLUE';
+      handlersRef.current.onCostumeSelect?.('blue');
+    } else if (text.includes('recon') || text.includes('green fox')) {
+      detected = 'COSTUME_GREEN';
+      handlersRef.current.onCostumeSelect?.('green');
+    } else if (text.includes('shadow') || text.includes('dark fox')) {
+      detected = 'COSTUME_DARK';
+      handlersRef.current.onCostumeSelect?.('dark');
     }
 
     if (detected) {
+      playSound('voice_success');
       setLastCommand(detected);
+
+      if (targetPath) {
+        handlersRef.current.onNavigate?.(targetPath);
+      }
+
+      // Broadcast globally so any mounted page/component can listen
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('playnexus_voice_command', {
+            detail: {
+              command: detected,
+              targetPath,
+              rawTranscript,
+            },
+          })
+        );
+      }
+
       if (clearCommandTimerRef.current) clearTimeout(clearCommandTimerRef.current);
       clearCommandTimerRef.current = setTimeout(() => {
         setLastCommand(null);
-      }, 2500);
+      }, 3000);
     }
-  }, []);
 
+    return detected;
+  }, [playSound]);
+
+  /**
+   * Stop listening / recording
+   */
   const stopListening = useCallback(() => {
     isListeningRef.current = false;
     setIsListening(false);
+    playSound('voice_stop');
+
+    // Stop Groq MediaRecorder
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        // Ignored
+      }
+    }
+
+    // Stop MediaStream tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    // Stop Web Speech if running
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -74,139 +225,167 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers): UseVoiceComman
         // Ignored
       }
     }
-  }, []);
+  }, [playSound]);
 
-  const startListening = useCallback(() => {
+  /**
+   * Start listening / recording with Groq Whisper (or fallback to Web Speech)
+   */
+  const startListening = useCallback(async () => {
     setError(null);
+    const key = getGroqApiKey();
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    // Strategy A: If Groq API Key exists, use high-fidelity Groq Whisper
+    if (key && key.length >= 10 && navigator.mediaDevices?.getUserMedia) {
+      try {
+        setEngine('groq');
+        playSound('voice_start');
+        audioChunksRef.current = [];
 
-    if (!SpeechRecognition) {
-      setIsSupported(false);
-      setError('Web Speech API is not supported in this browser.');
-      return;
-    }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 44100,
+          },
+        });
+        streamRef.current = stream;
 
-    if (recognitionRef.current && isListeningRef.current) {
-      return;
-    }
+        // Choose best supported mime type
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+          ? 'audio/ogg;codecs=opus'
+          : '';
 
-    try {
-      if (!recognitionRef.current) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
-        recognition.maxAlternatives = 1;
+        const mediaRecorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
 
-        recognition.onstart = () => {
+        mediaRecorderRef.current = mediaRecorder;
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstart = () => {
           isListeningRef.current = true;
           setIsListening(true);
           setError(null);
         };
 
-        recognition.onresult = (event: any) => {
-          const lastResultIndex = event.results.length - 1;
-          const transcript = event.results[lastResultIndex][0]?.transcript || '';
-          if (transcript) {
-            processTranscript(transcript);
-          }
-        };
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, {
+            type: mediaRecorder.mimeType || 'audio/webm',
+          });
+          audioChunksRef.current = [];
 
-        recognition.onerror = (event: any) => {
-          console.warn('[VOICE_COMMANDS] Speech recognition event:', event.error);
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            setError('Microphone access denied. Please grant permission to use voice commands.');
-            isListeningRef.current = false;
-            setIsListening(false);
-          } else if (event.error === 'no-speech') {
-            // No speech detected, stay listening
-          } else {
-            setError(`Speech recognition: ${event.error}`);
-          }
-        };
-
-        recognition.onend = () => {
-          // If still marked as listening, automatically restart recognition (continuous gaming loop)
-          if (isListeningRef.current) {
+          if (audioBlob.size > 200) {
+            setIsTranscribing(true);
             try {
-              recognition.start();
-            } catch {
-              // Browser may require small delay before restart
-              setTimeout(() => {
-                if (isListeningRef.current) {
-                  try {
-                    recognition.start();
-                  } catch {
-                    // Ignored
-                  }
-                }
-              }, 250);
+              const result = await transcribeAudioWithGroq(audioBlob);
+              if (result.error) {
+                setError(result.error);
+                playSound('voice_error');
+              } else if (result.text) {
+                processTranscript(result.text);
+              }
+            } catch (err: any) {
+              setError(err?.message || 'Whisper transcription failed.');
+              playSound('voice_error');
+            } finally {
+              setIsTranscribing(false);
             }
-          } else {
-            setIsListening(false);
           }
         };
 
-        recognitionRef.current = recognition;
+        mediaRecorder.start();
+        return;
+      } catch (micErr: any) {
+        console.warn('[VOICE] Groq Mic access error, trying fallback:', micErr);
+        // Fall back to Web Speech
       }
-
-      isListeningRef.current = true;
-      recognitionRef.current.start();
-      setIsListening(true);
-    } catch (err: any) {
-      console.warn('[VOICE_COMMANDS] Failed to start speech recognition:', err);
-      if (err.name === 'NotAllowedError') {
-        setError('Microphone permission denied.');
-      } else {
-        setError(err.message || 'Failed to activate microphone.');
-      }
-      isListeningRef.current = false;
-      setIsListening(false);
     }
-  }, [processTranscript]);
 
-  const toggleListening = useCallback(() => {
-    if (isListeningRef.current) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  }, [startListening, stopListening]);
-
-  // Check support on mount
-  useEffect(() => {
+    // Strategy B: Fallback to Web Speech API
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       setIsSupported(false);
-      setError('Web Speech API is not supported in this browser. Use keyboard controls [J, K, SPACE].');
+      setError('Please add a Groq API Key or use a browser supporting Web Speech API.');
+      playSound('voice_error');
+      return;
     }
 
-    return () => {
-      isListeningRef.current = false;
-      if (clearCommandTimerRef.current) clearTimeout(clearCommandTimerRef.current);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-          recognitionRef.current.abort();
-        } catch {
-          // Ignored
+    try {
+      setEngine('webspeech');
+      playSound('voice_start');
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isListeningRef.current = true;
+        setIsListening(true);
+        setError(null);
+      };
+
+      recognition.onresult = (event: any) => {
+        const lastResultIndex = event.results.length - 1;
+        const transcript = event.results[lastResultIndex][0]?.transcript || '';
+        if (transcript) {
+          processTranscript(transcript);
         }
-      }
-    };
-  }, []);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('[VOICE] Speech recognition error:', event.error);
+        if (event.error !== 'no-speech') {
+          setError(`Speech: ${event.error}`);
+          playSound('voice_error');
+        }
+        setIsListening(false);
+        isListeningRef.current = false;
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        isListeningRef.current = false;
+      };
+
+      recognition.start();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to start speech recognition.');
+      playSound('voice_error');
+    }
+  }, [playSound, processTranscript]);
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [isListening, startListening, stopListening]);
 
   return {
     isSupported,
     isListening,
+    isTranscribing,
+    engine,
     lastCommand,
     recognizedText,
     error,
+    hasGroqKey: hasKey,
     startListening,
     stopListening,
     toggleListening,
+    processTranscript,
   };
 }

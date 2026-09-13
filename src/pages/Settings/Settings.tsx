@@ -11,6 +11,9 @@ import {
   Save,
   RotateCcw,
   Sparkles,
+  AlertCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { GlowButton } from '../../components/common/GlowButton';
 import { Logo } from '../../components/common/Logo';
@@ -18,6 +21,14 @@ import { Scanline } from '../../components/effects/Scanline';
 import { useSound } from '../../hooks/useSound';
 import { useDemoStore } from '../../demo/demoStore';
 import { useCostumeStore } from '../../store/costumeStore';
+import {
+  getGroqApiKey,
+  setGroqApiKey,
+  testGroqConnection,
+  getGroqWhisperModel,
+  setGroqWhisperModel,
+  type GroqWhisperModel,
+} from '../../services/groqWhisperService';
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +39,12 @@ export const Settings: React.FC = () => {
   // Settings State
   const [sfxVolume, setSfxVolume] = useState<number>(85);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+  const [groqKey, setGroqKey] = useState<string>(getGroqApiKey());
+  const [showGroqKey, setShowGroqKey] = useState<boolean>(false);
+  const [whisperModel, setWhisperModelState] = useState<GroqWhisperModel>(getGroqWhisperModel());
+  const [groqTestStatus, setGroqTestStatus] = useState<{ testing: boolean; message?: string; success?: boolean }>({
+    testing: false,
+  });
   const [cameraEnabled, setCameraEnabled] = useState<boolean>(true);
   const [graphicsQuality, setGraphicsQuality] = useState<'ULTRA' | 'BALANCED' | 'BATTERY_SAVER'>('BALANCED');
   const [reducedMotion, setReducedMotion] = useState<boolean>(false);
@@ -61,11 +78,25 @@ export const Settings: React.FC = () => {
     };
     try {
       localStorage.setItem('playnexus_settings', JSON.stringify(settingsPayload));
+      setGroqApiKey(groqKey);
+      setGroqWhisperModel(whisperModel);
     } catch {
       // Ignored
     }
     setSavedNotice(true);
     setTimeout(() => setSavedNotice(false), 2500);
+  };
+
+  const handleTestGroqKey = async () => {
+    playSound('click');
+    setGroqTestStatus({ testing: true });
+    const res = await testGroqConnection(groqKey);
+    setGroqTestStatus({ testing: false, success: res.success, message: res.message });
+    if (res.success) {
+      playSound('granted');
+    } else {
+      playSound('denied');
+    }
   };
 
   const handleResetDefaults = () => {
@@ -75,6 +106,7 @@ export const Settings: React.FC = () => {
     setCameraEnabled(true);
     setGraphicsQuality('BALANCED');
     setReducedMotion(false);
+    setWhisperModelState('whisper-large-v3-turbo');
   };
 
   return (
@@ -232,7 +264,10 @@ export const Settings: React.FC = () => {
                   max="100"
                   value={sfxVolume}
                   disabled={isMuted}
-                  onChange={(e) => setSfxVolume(Number(e.target.value))}
+                  onChange={(e) => {
+                    setSfxVolume(Number(e.target.value));
+                    playSound('hover');
+                  }}
                   style={{
                     width: '100%',
                     accentColor: '#00f0ff',
@@ -246,51 +281,231 @@ export const Settings: React.FC = () => {
               </div>
             </div>
 
-            {/* Setting Card 2: Voice Commands (Web Speech API) */}
+            {/* Setting Card 2: Groq Whisper Voice Engine */}
             <div
               style={{
                 padding: '22px',
-                background: 'rgba(12, 18, 34, 0.7)',
-                border: '1px solid rgba(157, 78, 221, 0.2)',
+                background: 'rgba(12, 18, 34, 0.8)',
+                border: groqKey ? '1px solid rgba(0, 240, 255, 0.35)' : '1px solid rgba(157, 78, 221, 0.3)',
                 borderRadius: '14px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '16px',
+                boxShadow: groqKey ? '0 0 20px rgba(0, 240, 255, 0.08)' : 'none',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9d4edd', fontFamily: 'var(--font-hud)', fontSize: '0.86rem', fontWeight: 700 }}>
-                  <Mic size={18} />
-                  <span>VOICE COMBAT TRIGGERS</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00f0ff', fontFamily: 'var(--font-hud)', fontSize: '0.88rem', fontWeight: 800 }}>
+                  <Mic size={18} color="#00f0ff" />
+                  <span>GROQ WHISPER VOICE ENGINE</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    playSound('click');
-                    setVoiceEnabled(!voiceEnabled);
-                  }}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      background: groqKey ? 'rgba(0, 240, 255, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                      border: groqKey ? '1px solid #00f0ff' : '1px solid rgba(148, 163, 184, 0.3)',
+                      color: groqKey ? '#00f0ff' : '#94a3b8',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.64rem',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {groqKey ? '⚡ GROQ LPU' : '🌐 WEB SPEECH'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      setVoiceEnabled(!voiceEnabled);
+                    }}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      background: voiceEnabled ? 'rgba(0, 255, 157, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                      border: voiceEnabled ? '1px solid #00ff9d' : '1px solid rgba(255, 255, 255, 0.2)',
+                      color: voiceEnabled ? '#00ff9d' : '#94a3b8',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {voiceEnabled ? 'ENABLED' : 'DISABLED'}
+                  </button>
+                </div>
+              </div>
+
+              {/* API Key Input Field */}
+              <div>
+                <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#38bdf8', marginBottom: '6px', fontWeight: 700 }}>
+                  <span>GROQ API KEY</span>
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: '#00f0ff', textDecoration: 'underline', fontSize: '0.68rem' }}
+                  >
+                    Get free key at console.groq.com
+                  </a>
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <input
+                      type={showGroqKey ? 'text' : 'password'}
+                      placeholder="gsk_..."
+                      value={groqKey}
+                      onChange={(e) => setGroqKey(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 36px 9px 12px',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '1px solid rgba(0, 240, 255, 0.25)',
+                        borderRadius: '8px',
+                        color: '#ffffff',
+                        fontFamily: 'monospace',
+                        fontSize: '0.78rem',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowGroqKey(!showGroqKey);
+                        playSound('click');
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        padding: '4px',
+                      }}
+                    >
+                      {showGroqKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleTestGroqKey}
+                    disabled={groqTestStatus.testing || !groqKey}
+                    style={{
+                      padding: '9px 14px',
+                      borderRadius: '8px',
+                      background: 'rgba(0, 240, 255, 0.15)',
+                      border: '1px solid rgba(0, 240, 255, 0.4)',
+                      color: '#00f0ff',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: groqKey ? 'pointer' : 'not-allowed',
+                      opacity: groqKey ? 1 : 0.5,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {groqTestStatus.testing ? 'TESTING...' : 'TEST KEY'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Test Status Banner */}
+              {groqTestStatus.message && (
+                <div
                   style={{
-                    padding: '4px 12px',
-                    borderRadius: '6px',
-                    background: voiceEnabled ? 'rgba(0, 255, 157, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                    border: voiceEnabled ? '1px solid #00ff9d' : '1px solid rgba(255, 255, 255, 0.2)',
-                    color: voiceEnabled ? '#00ff9d' : '#94a3b8',
-                    fontFamily: 'var(--font-mono)',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: groqTestStatus.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                    border: groqTestStatus.success ? '1px solid #10b981' : '1px solid #ef4444',
+                    color: groqTestStatus.success ? '#6ee7b7' : '#fca5a5',
                     fontSize: '0.72rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
                   }}
                 >
-                  {voiceEnabled ? 'ENABLED' : 'DISABLED'}
-                </button>
+                  {groqTestStatus.success ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                  <span>{groqTestStatus.message}</span>
+                </div>
+              )}
+
+              {/* Whisper Model Selector */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', color: '#38bdf8', marginBottom: '6px', fontWeight: 700 }}>
+                  MODEL SELECTION
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWhisperModelState('whisper-large-v3-turbo');
+                      playSound('click');
+                    }}
+                    style={{
+                      padding: '8px',
+                      borderRadius: '8px',
+                      background: whisperModel === 'whisper-large-v3-turbo' ? 'rgba(0, 240, 255, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                      border: whisperModel === 'whisper-large-v3-turbo' ? '1px solid #00f0ff' : '1px solid rgba(255,255,255,0.1)',
+                      color: whisperModel === 'whisper-large-v3-turbo' ? '#00f0ff' : '#94a3b8',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    whisper-large-v3-turbo
+                    <div style={{ fontSize: '0.58rem', opacity: 0.7 }}>⚡ Sub-second (Gaming)</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWhisperModelState('whisper-large-v3');
+                      playSound('click');
+                    }}
+                    style={{
+                      padding: '8px',
+                      borderRadius: '8px',
+                      background: whisperModel === 'whisper-large-v3' ? 'rgba(0, 240, 255, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                      border: whisperModel === 'whisper-large-v3' ? '1px solid #00f0ff' : '1px solid rgba(255,255,255,0.1)',
+                      color: whisperModel === 'whisper-large-v3' ? '#00f0ff' : '#94a3b8',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    whisper-large-v3
+                    <div style={{ fontSize: '0.58rem', opacity: 0.7 }}>🎯 Max Accuracy</div>
+                  </button>
+                </div>
               </div>
 
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: '#cbd5e1', lineHeight: 1.6 }}>
-                Commands supported: <span style={{ color: '#00f0ff' }}>"Attack"</span>, <span style={{ color: '#9d4edd' }}>"Block"</span>, <span style={{ color: '#ff0055' }}>"Dodge"</span>, <span style={{ color: '#00ff9d' }}>"Special"</span>.
-              </div>
-
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: '#64748b' }}>
-                Uses browser Web Speech API for hands-free or dual-input combat execution alongside standard keyboard controls.
+              {/* Supported Commands Tags */}
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: '#cbd5e1', lineHeight: 1.6 }}>
+                Commands supported across all pages:
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                  {['Attack', 'Block', 'Dodge', 'Special', 'Home', 'Arena', 'Pre-Fight', 'Character Select', 'Leaderboard', 'Settings', 'Mute', 'Archery', 'Melee'].map((cmd) => (
+                    <span
+                      key={cmd}
+                      style={{
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        background: 'rgba(0, 240, 255, 0.1)',
+                        border: '1px solid rgba(0, 240, 255, 0.25)',
+                        fontSize: '0.62rem',
+                        color: '#38bdf8',
+                        fontWeight: 600,
+                      }}
+                    >
+                      "{cmd}"
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
 

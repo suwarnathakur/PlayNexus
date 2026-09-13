@@ -170,7 +170,13 @@ export const CharacterSelect: React.FC = () => {
 
   const handleSelect = (style: FightingStyle) => {
     if (style.isPlayable) {
-      playSound('click');
+      if (style.id === 'archery') {
+        playSound('arrow_shot');
+      } else if (style.id === 'melee') {
+        playSound('laser');
+      } else {
+        playSound('click');
+      }
       setSelectedStyleId(style.id);
       if (style.id === 'melee' || style.id === 'archery') {
         setStoreStyle(style.id);

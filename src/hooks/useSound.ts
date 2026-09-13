@@ -19,7 +19,13 @@ export type SoundType =
   | 'laser'   // Arwing blaster chirp
   | 'arrow_shot' // Plasma Bow twang and high-speed energy release
   | 'arrow_hit'  // Plasma arrow impact discharge
-  | 'bow_charge'; // Bowstring plasma charge build-up
+  | 'bow_charge' // Bowstring plasma charge build-up
+  | 'voice_start' // Voice mic activation rising chirp
+  | 'voice_stop'  // Voice mic recording stop chirp
+  | 'voice_success' // Affirmative chime when Groq parses command
+  | 'voice_error'   // Warning buzz on voice error
+  | 'combo_burst'   // Harmonic surge on combo milestones
+  | 'stage_select'; // Heavy bass thud on arena selection
 
 // Global audio state shared across components, persisted in localStorage
 let globalAudioMuted = false;
@@ -432,6 +438,116 @@ export const useSound = () => {
 
           osc.connect(g); g.connect(ctx.destination);
           osc.start(now); osc.stop(now + 0.24);
+          break;
+        }
+
+        case 'voice_start': {
+          // Futuristic rising dual-chirp when mic engages
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc1.type = 'sine';
+          osc2.type = 'triangle';
+          osc1.frequency.setValueAtTime(580, now);
+          osc1.frequency.exponentialRampToValueAtTime(1180, now + 0.08);
+          osc2.frequency.setValueAtTime(1160, now);
+          osc2.frequency.exponentialRampToValueAtTime(2360, now + 0.08);
+          g.gain.setValueAtTime(0.08, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+          osc1.connect(g);
+          osc2.connect(g);
+          g.connect(ctx.destination);
+          osc1.start(now); osc1.stop(now + 0.09);
+          osc2.start(now); osc2.stop(now + 0.09);
+          break;
+        }
+
+        case 'voice_stop': {
+          // Soft descending chime when audio processing begins
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(920, now);
+          osc.frequency.exponentialRampToValueAtTime(420, now + 0.1);
+          g.gain.setValueAtTime(0.07, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.1);
+          break;
+        }
+
+        case 'voice_success': {
+          // Sci-fi affirmative melodic chord (A4 -> C#5 -> E5 -> A5)
+          const notes = [440, 554.37, 659.25, 880];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.045);
+            g.gain.setValueAtTime(0.09, now + idx * 0.045);
+            g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.045 + 0.28);
+            osc.connect(g);
+            g.connect(ctx.destination);
+            osc.start(now + idx * 0.045);
+            osc.stop(now + idx * 0.045 + 0.28);
+          });
+          break;
+        }
+
+        case 'voice_error': {
+          // Low glitch warning tone
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(110, now + 0.22);
+          g.gain.setValueAtTime(0.12, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.22);
+          break;
+        }
+
+        case 'combo_burst': {
+          // Resonant bass punch + electric sweep for combo streaks
+          const oscBass = ctx.createOscillator();
+          const oscZing = ctx.createOscillator();
+          const gBass = ctx.createGain();
+          const gZing = ctx.createGain();
+
+          oscBass.type = 'sine';
+          oscBass.frequency.setValueAtTime(150, now);
+          oscBass.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+          gBass.gain.setValueAtTime(0.18, now);
+          gBass.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+          oscZing.type = 'sawtooth';
+          oscZing.frequency.setValueAtTime(1200, now);
+          oscZing.frequency.exponentialRampToValueAtTime(2400, now + 0.08);
+          gZing.gain.setValueAtTime(0.07, now);
+          gZing.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+          oscBass.connect(gBass); gBass.connect(ctx.destination);
+          oscZing.connect(gZing); gZing.connect(ctx.destination);
+          oscBass.start(now); oscBass.stop(now + 0.18);
+          oscZing.start(now); oscZing.stop(now + 0.08);
+          break;
+        }
+
+        case 'stage_select': {
+          // Heavy mechanical hydraulic thud
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(110, now);
+          osc.frequency.exponentialRampToValueAtTime(35, now + 0.16);
+          g.gain.setValueAtTime(0.16, now);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.16);
           break;
         }
       }

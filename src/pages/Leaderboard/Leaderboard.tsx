@@ -321,6 +321,8 @@ export const Leaderboard: React.FC = () => {
                 return (
                   <div
                     key={entry.playerId || idx}
+                    onMouseEnter={() => playSound('hover')}
+                    onClick={() => playSound('click')}
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '80px 2fr 1.2fr 1fr 1.2fr',
@@ -330,6 +332,7 @@ export const Leaderboard: React.FC = () => {
                       background: rank <= 3 ? 'rgba(12, 18, 34, 0.7)' : 'rgba(8, 12, 22, 0.5)',
                       border: rank === 1 ? '1px solid rgba(251, 191, 36, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
                       borderRadius: '12px',
+                      cursor: 'pointer',
                       transition: 'all 0.2s ease',
                     }}
                   >
