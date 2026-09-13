@@ -157,59 +157,6 @@ const ArenaStage: React.FC = () => {
 };
 
 /**
- * Floating 3D cyber dust / sparks with mobile optimization
- */
-const CyberParticles3D: React.FC = () => {
-  const pointsRef = useRef<THREE.Points>(null);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const count = isMobile ? 28 : 70;
-
-  const positions = React.useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 14;
-      pos[i * 3 + 1] = Math.random() * 6;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 8;
-    }
-    return pos;
-  }, [count]);
-
-  useFrame((state) => {
-    if (pointsRef.current) {
-      const t = state.clock.getElapsedTime();
-      const pos = pointsRef.current.geometry.attributes.position.array as Float32Array;
-      for (let i = 0; i < count; i++) {
-        // Slow vertical ascent with gentle sway
-        pos[i * 3 + 1] += 0.008;
-        pos[i * 3] += Math.sin(t * 0.8 + i) * 0.003;
-        if (pos[i * 3 + 1] > 6) {
-          pos[i * 3 + 1] = 0.2;
-        }
-      }
-      pointsRef.current.geometry.attributes.position.needsUpdate = true;
-    }
-  });
-
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-        />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.06}
-        color="#00f0ff"
-        transparent
-        opacity={0.6}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
-  );
-};
-
-/**
  * Smooth cinematic camera controller with reduced-motion support
  */
 const CinematicCamera: React.FC<{ mouseX: number; mouseY: number }> = ({ mouseX, mouseY }) => {

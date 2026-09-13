@@ -9,6 +9,7 @@ import { Arena } from '../pages/Arena/Arena';
 import { Analysis } from '../pages/Analysis/Analysis';
 import { Leaderboard } from '../pages/Leaderboard/Leaderboard';
 import { Settings } from '../pages/Settings/Settings';
+import { Profile } from '../pages/Profile/Profile';
 
 export const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/arena" element={<Arena />} />
       <Route path="/analysis" element={<Analysis />} />
       <Route path="/leaderboard" element={<Leaderboard />} />
+      <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
       {/* Fallback route */}
       <Route

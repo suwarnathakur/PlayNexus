@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { analyzeBehavior, generateStrategy, scanWeapon } from '../controllers/aiController.js';
-import { getPlayerDNA } from '../controllers/playerController.js';
+import { getPlayerDNA, getPlayerProfile, updatePlayerProfile } from '../controllers/playerController.js';
 import { completeMatch, getLeaderboard } from '../controllers/matchController.js';
 import { triggerLockIn } from '../controllers/lockInController.js';
 
@@ -14,6 +14,10 @@ router.post('/generate-strategy', generateStrategy);
 
 // 3. Player Fighting DNA Retrieval
 router.get('/player/:playerId/dna', getPlayerDNA);
+
+// 3b. Full persistent player profile retrieval + updates
+router.get('/player/:playerId/profile', getPlayerProfile);
+router.put('/player/:playerId/profile', updatePlayerProfile);
 
 // 4. Match Completion & Telemetry Synchronization
 router.post('/match/complete', completeMatch);

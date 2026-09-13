@@ -44,29 +44,62 @@ const playerSchema = new mongoose.Schema(
       default: 'CYBER_OPERATIVE',
       trim: true,
     },
+    name: {
+      type: String,
+      default: 'CYBER_VIPER',
+      trim: true,
+    },
     level: {
       type: Number,
-      default: 1,
+      default: 7,
     },
-    exp: {
+    xp: {
       type: Number,
-      default: 0,
+      default: 3420,
+    },
+    xpToNextLevel: {
+      type: Number,
+      default: 5000,
+    },
+    totalMatches: {
+      type: Number,
+      default: 24,
     },
     matchesPlayed: {
       type: Number,
-      default: 0,
+      default: 24,
     },
     wins: {
       type: Number,
-      default: 0,
+      default: 16,
     },
     losses: {
       type: Number,
-      default: 0,
+      default: 8,
     },
     winRate: {
       type: Number,
-      default: 0,
+      default: 66.7,
+    },
+    currentStreak: {
+      type: Number,
+      default: 3,
+    },
+    bestStreak: {
+      type: Number,
+      default: 5,
+    },
+    totalDamage: {
+      type: Number,
+      default: 32480,
+    },
+    favoriteStyle: {
+      type: String,
+      default: 'HYBRID STRIKER',
+    },
+    adaptationScore: {
+      type: Number,
+      default: 91,
     },
     fightingDNA: {
       type: fightingDNASchema,
@@ -86,8 +119,9 @@ const playerSchema = new mongoose.Schema(
 
 // Virtual for auto win rate
 playerSchema.methods.calculateWinRate = function () {
-  if (this.matchesPlayed === 0) return 0;
-  this.winRate = Math.round((this.wins / this.matchesPlayed) * 100);
+  const total = Number(this.totalMatches ?? this.matchesPlayed ?? 0);
+  if (total === 0) return 0;
+  this.winRate = Number(((this.wins / total) * 100).toFixed(1));
   return this.winRate;
 };
 

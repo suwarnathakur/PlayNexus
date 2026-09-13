@@ -157,6 +157,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigateLogin }) => {
               { label: 'PRE-FIGHT', path: '/pre-fight', icon: <ShieldCheck size={14} /> },
               { label: '3D ARENA', path: '/arena', icon: <Swords size={14} /> },
               { label: 'DNA ANALYSIS', path: '/analysis', icon: <Dna size={14} /> },
+              { label: 'PROFILE', path: '/profile', icon: <UserCheck size={14} /> },
               { label: 'LEADERBOARD', path: '/leaderboard', icon: <Trophy size={14} /> },
               { label: 'SETTINGS', path: '/settings', icon: <SettingsIcon size={14} /> },
             ].map((item) => (
