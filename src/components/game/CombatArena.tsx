@@ -141,12 +141,13 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
   const wasMoving = useRef(false);
 
   useFrame((state, delta) => {
-    if (!groupRef.current) return;
-
     if (isDead) {
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -Math.PI / 2, delta * 6);
       groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0.25, delta * 6);
       return;
+    } else {
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, delta * 12);
+      groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0, delta * 12);
     }
 
     // 1. Movement Input
@@ -274,6 +275,9 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, Math.PI / 2, delta * 6);
       groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0.25, delta * 6);
       return;
+    } else {
+      groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, 0, delta * 12);
+      groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, 0, delta * 12);
     }
 
     // 1. Update AI Controller (Finite State Machine Decision & Movement Tick)
@@ -1103,8 +1107,11 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     setEnemyHp(ENEMY_MAX_HP);
     setComboCount(0);
     setLastDamageEvent(null);
-    playerPosRef.current.set(-2.2, 0.2, 0);
-    enemyPosRef.current.set(2.5, 0.2, 0);
+    playerPosRef.current.set(-2.2, 0.22, 0);
+    enemyPosRef.current.set(2.5, 0.22, 0);
+    setPlayerCoordinates([-2.2, 0.22, 0]);
+    setIsPlayerHit(false);
+    setIsEnemyHit(false);
     aiControllerRef.current.reset();
     dodgeLockManagerRef.current.reset();
     setIsPlayerAttacking(false);

@@ -195,13 +195,16 @@ export const FoxCharacter3D: React.FC<FoxCharacter3DProps> = ({
       shineRef.current.scale.set(pulse, pulse, pulse);
     }
 
-    // 2. Dead collapse
+    // 2. Dead collapse / Stand Up when Alive
     if (isDead) {
       if (rootGroupRef.current) {
         rootGroupRef.current.rotation.x = THREE.MathUtils.lerp(rootGroupRef.current.rotation.x, -Math.PI / 2, delta * 6);
         rootGroupRef.current.position.y = THREE.MathUtils.lerp(rootGroupRef.current.position.y, 0.15, delta * 6);
       }
       return;
+    } else if (rootGroupRef.current) {
+      rootGroupRef.current.rotation.x = THREE.MathUtils.lerp(rootGroupRef.current.rotation.x, 0, delta * 12);
+      rootGroupRef.current.position.y = THREE.MathUtils.lerp(rootGroupRef.current.position.y, 0, delta * 12);
     }
 
     // 3. Dynamic Bushy Tail Swaying Physics
