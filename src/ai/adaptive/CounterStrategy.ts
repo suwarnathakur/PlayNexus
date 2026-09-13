@@ -1,3 +1,5 @@
+import type { AIStrategy, AdaptationLevel } from './StrategyTypes';
+
 /**
  * PLAYNEXUS Counter Strategy Types
  * Defines the concrete tactical adaptations and behavioral modifiers
@@ -22,8 +24,8 @@ export interface CounterStrategy {
   defenseMode: DefenseMode;
   antiComboTactics: boolean;
   targetComboPattern: string | null;
-  blockProbabilityOnPlayerAttack: number; // 0.0 to 1.0 (e.g. 0.85 when player combo spam is detected)
-  counterAttackAfterBlockProbability: number; // 0.0 to 1.0 (chance to instantly strike back after absorbing a hit)
+  blockProbabilityOnPlayerAttack: number; // 0.0 to 1.0
+  counterAttackAfterBlockProbability: number; // 0.0 to 1.0
 
   // Locomotion & Spatial Pressure
   pressureMode: PressureMode;
@@ -35,4 +37,8 @@ export interface CounterStrategy {
   comboPatternName: string;
   predictabilityLevel: 'HIGH' | 'MODERATE' | 'LOW';
   adaptationConfidence: number; // 0.00 to 1.00
+  adaptationLevel: AdaptationLevel;
+
+  // Unified AIStrategy contract
+  aiStrategy: AIStrategy;
 }

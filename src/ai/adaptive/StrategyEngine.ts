@@ -1,40 +1,51 @@
 import type { FightingDNAProfile } from '../FightingDNA/DNATypes';
 import type { CounterStrategy, CounterDodgeTactic, DefenseMode, PressureMode } from './CounterStrategy';
+import type { AIStrategy, AdaptationLevel, TargetDodgeDirection, RangePreference } from './StrategyTypes';
+import type { DetectedPattern } from '../behavior/BehaviorTypes';
 
 /**
  * PLAYNEXUS Strategy Engine
- * Evaluates the player's Fighting DNA from previous matches to generate
- * an adaptive counter-strategy for the AI opponent.
+ * Evaluates the player's Fighting DNA and detected behavioral patterns
+ * to generate an adaptive counter-strategy for the AI opponent.
  */
 export class StrategyEngine {
   /**
    * Generates a concrete counter-strategy tailored to exploit the player's Fighting DNA.
    */
-  public static generateStrategy(dna: FightingDNAProfile): CounterStrategy {
+  public static generateStrategy(
+    dna: FightingDNAProfile,
+    patterns: DetectedPattern[] = []
+  ): CounterStrategy {
     const activeTactics: string[] = [];
 
-    // 1. Counter Dodge Logic
-    // If player has a preferred dodge direction, intercept that side
+    // --- RULE 1: PLAYER DODGES LEFT (> 70%) ---
     let counterDodge: CounterDodgeTactic = 'NEUTRAL';
     let interceptDodgeBias: 'left' | 'right' | null = null;
-    const dodgeLeftFrequency = (dna.dodgeLeftPercentage || 50) / 100;
+    let targetDodgeDirection: TargetDodgeDirection = 'none';
+    const dodgeLeftFrequency = dna.dodgeLeftFrequency || (dna.dodgeLeftPercentage || 50) / 100;
+    const dodgeRightFrequency = dna.dodgeRightFrequency || (dna.dodgeRightPercentage || 50) / 100;
 
-    if (dna.preferredDodge === 'left' || dodgeLeftFrequency >= 0.55) {
+    const hasLeftDodgePattern = patterns.some((p) => p.type === 'PREFERRED_DODGE_LEFT') || dodgeLeftFrequency >= 0.70;
+    const hasRightDodgePattern = patterns.some((p) => p.type === 'PREFERRED_DODGE_RIGHT') || dodgeRightFrequency >= 0.70;
+
+    if (hasLeftDodgePattern || dna.preferredDodge === 'left') {
       counterDodge = 'COUNTER_LEFT';
       interceptDodgeBias = 'left';
-      activeTactics.push(`COUNTER LEFT DODGE // INTERCEPT FLANK (${Math.round(dodgeLeftFrequency * 100)}% BIAS)`);
-    } else if (dna.preferredDodge === 'right' || dna.dodgeRightPercentage >= 55) {
+      targetDodgeDirection = 'left';
+      activeTactics.push(`COUNTER LEFT DODGE // FLANK INTERCEPT (${Math.round(dodgeLeftFrequency * 100)}% BIAS)`);
+    } else if (hasRightDodgePattern || dna.preferredDodge === 'right') {
       counterDodge = 'COUNTER_RIGHT';
       interceptDodgeBias = 'right';
-      activeTactics.push(`COUNTER RIGHT DODGE // INTERCEPT OFF-AXIS (${dna.dodgeRightPercentage}% BIAS)`);
+      targetDodgeDirection = 'right';
+      activeTactics.push(`COUNTER RIGHT DODGE // OFF-AXIS ANGLE (${Math.round(dodgeRightFrequency * 100)}% BIAS)`);
     }
 
-    // 2. Anti-Combo & Repeated Pattern Logic
-    // If player repeatedly chains multi-hit combos or strike spams
-    const hasRepeatedCombo = dna.repeatedCombos && dna.repeatedCombos.length > 0;
-    const isHighCombo = dna.averageComboLength >= 1.8;
-    const antiComboTactics = hasRepeatedCombo || isHighCombo;
-    const comboPatternName = hasRepeatedCombo
+    // --- RULE 2: REPEATED COMBO (e.g. LIGHT-LIGHT-HEAVY) ---
+    const hasRepeatedComboPattern = patterns.some((p) => p.type === 'REPEATED_COMBO');
+    const hasRepeatedCombo = hasRepeatedComboPattern || (dna.repeatedCombos && dna.repeatedCombos.length > 0);
+    const isHighCombo = dna.averageComboLength >= 2.0;
+    const counterCombo = hasRepeatedCombo || isHighCombo;
+    const comboPatternName = hasRepeatedCombo && dna.repeatedCombos.length > 0
       ? dna.repeatedCombos[0].includes('Triple')
         ? 'LIGHT-LIGHT-HEAVY'
         : dna.repeatedCombos[0]
@@ -42,75 +53,131 @@ export class StrategyEngine {
       ? 'LIGHT-LIGHT-HEAVY'
       : 'SINGLE-JAB-POKE';
 
-    let blockProbabilityOnPlayerAttack = 0.45; // baseline
-    let counterAttackAfterBlockProbability = 0.35; // baseline
+    let blockProbabilityOnPlayerAttack = 0.45;
+    let counterAttackAfterBlockProbability = 0.35;
 
-    if (antiComboTactics) {
-      blockProbabilityOnPlayerAttack = 0.85; // 85% chance to raise guard against signature combo
-      counterAttackAfterBlockProbability = 0.80; // 80% chance to immediately strike back
+    if (counterCombo) {
+      blockProbabilityOnPlayerAttack = 0.88; // 88% chance to block 2nd strike
+      counterAttackAfterBlockProbability = 0.85; // 85% counter on heavy finisher
       activeTactics.push(`ANTI-COMBO ADAPTATION // AUTO-BLOCK & PARRY (${comboPatternName})`);
     }
 
-    // 3. Aggression Adaptation (Player constantly attacks -> AI becomes defensive)
+    // --- RULE 3: HIGH AGGRESSION (> 0.75) ---
+    const isHighAggression = patterns.some((p) => p.type === 'HIGH_AGGRESSION') || dna.aggression >= 0.75;
     let defenseMode: DefenseMode = 'NORMAL';
-    if (dna.aggression >= 0.65) {
+    let defensiveLevel = 0.45;
+    let aggressionLevel = 0.55;
+
+    if (isHighAggression) {
       defenseMode = 'HIGH_GUARD';
-      blockProbabilityOnPlayerAttack = Math.max(blockProbabilityOnPlayerAttack, 0.80);
-      counterAttackAfterBlockProbability = Math.max(counterAttackAfterBlockProbability, 0.85);
-      activeTactics.push('PATIENT HIGH-GUARD // ABSORB RUSH AND PUNISH RECOVERY');
+      defensiveLevel = 0.85;
+      aggressionLevel = 0.40; // Patient baiting
+      blockProbabilityOnPlayerAttack = Math.max(blockProbabilityOnPlayerAttack, 0.82);
+      counterAttackAfterBlockProbability = Math.max(counterAttackAfterBlockProbability, 0.88);
+      activeTactics.push('HIGH-GUARD COUNTER-STRIKER // BAIT RUSH & PUNISH WHIFFS');
     }
 
-    // 4. Distance / Retreating Adaptation (Player backs away -> AI increases pressure)
+    // --- RULE 4: DEFENSIVE PLAYER (> 0.70) ---
+    const isDefensivePlayer = patterns.some((p) => p.type === 'DEFENSIVE_STYLE') || dna.defense >= 0.70;
     let pressureMode: PressureMode = 'METHODICAL';
-    let approachSpeedMultiplier = 1.0;
+    let pressureLevel = 0.50;
+    let useFeints = false;
 
-    if (dna.preferredRange === 'far' || dna.aggression <= 0.42 || dna.mobility <= 0.38) {
+    if (isDefensivePlayer) {
       pressureMode = 'RELENTLESS_CHASE';
-      approachSpeedMultiplier = 1.45; // 45% faster sprint to hunt down retreating player
-      activeTactics.push('RELENTLESS RUSHDOWN // SPRINT CLOSURE & BOUNDARY PIN');
-    } else if (dna.aggression >= 0.75) {
-      pressureMode = 'PUNISH_WHIFF';
-      approachSpeedMultiplier = 0.9; // bait the aggressive player into swinging first
-      activeTactics.push('BAIT & SPACING CADENCE // PUNISH OVEREXTENSION');
+      pressureLevel = 0.85;
+      useFeints = true; // Use feints & delayed strikes to crack guard
+      activeTactics.push('GUARD CRACKER // FEINTS, DELAYED TIMING & SHIELD PRESSURE');
     }
 
-    // 5. Predictability Level
+    // --- RULE 5: LONG-RANGE PLAYER ---
+    const isLongRange = patterns.some((p) => p.type === 'LONG_RANGE_PLAYER') || dna.preferredRange === 'long';
+    let approachSpeedMultiplier = 1.0;
+    const preferredRange: RangePreference = isLongRange ? 'long' : dna.preferredRange === 'close' ? 'close' : 'medium';
+
+    if (isLongRange) {
+      pressureMode = 'RELENTLESS_CHASE';
+      approachSpeedMultiplier = 1.45; // 45% faster sprint to eliminate standoff distance
+      pressureLevel = Math.max(pressureLevel, 0.90);
+      activeTactics.push('CORNER PIN RUSHDOWN // SPRINT CLOSURE & BOUNDARY TRAP');
+    }
+
+    // --- RULE 6: PREDICTABLE TIMING ---
+    const isPredictableTiming = patterns.some((p) => p.type === 'PREDICTABLE_ATTACK_TIMING') || dna.predictabilityIndex >= 0.70;
+    if (isPredictableTiming) {
+      useFeints = true;
+      activeTactics.push('DYNAMIC TEMPO VARIATION // DISRUPT PREDICTABLE RHYTHM');
+    }
+
+    // --- PREDICTABILITY LEVEL & CONFIDENCE ---
     const predictabilityLevel =
-      dna.predictabilityIndex >= 0.65
+      dna.predictabilityIndex >= 0.68
         ? 'HIGH'
-        : dna.predictabilityIndex >= 0.42
+        : dna.predictabilityIndex >= 0.44
         ? 'MODERATE'
         : 'LOW';
 
-    // Build tactical summary
-    const tacticalDescription =
-      counterDodge !== 'NEUTRAL'
-        ? `${counterDodge.replace('_', ' ')} // ${comboPatternName} PARRY ACTIVE`
-        : `ADAPTIVE COUNTER: ${defenseMode} + ${pressureMode}`;
-
     const adaptationConfidence = Number(
-      Math.min(0.98, Math.max(0.55, dna.predictabilityIndex * 0.6 + 0.4)).toFixed(2)
+      Math.min(0.98, Math.max(0.40, dna.predictabilityIndex * 0.65 + (activeTactics.length >= 3 ? 0.25 : 0.15))).toFixed(2)
     );
+
+    // --- ADAPTATION LEVEL CALCULATION (0 to 4) ---
+    let adaptationLevel: AdaptationLevel = 0;
+    if (dna.totalAttacks <= 2) {
+      adaptationLevel = 0; // BASELINE
+    } else if (dna.totalAttacks <= 6 && adaptationConfidence < 0.65) {
+      adaptationLevel = 1; // OBSERVING
+    } else if (activeTactics.length >= 1 && adaptationConfidence >= 0.65 && adaptationConfidence < 0.78) {
+      adaptationLevel = 2; // PATTERN FOUND
+    } else if (activeTactics.length >= 1 && adaptationConfidence >= 0.78 && activeTactics.length < 3) {
+      adaptationLevel = 3; // COUNTER ACTIVE
+    } else if (adaptationConfidence >= 0.85 && activeTactics.length >= 2) {
+      adaptationLevel = 4; // HIGH ADAPTATION
+    } else {
+      adaptationLevel = 2;
+    }
+
+    // Build unified AIStrategy object
+    const aiStrategy: AIStrategy = {
+      aggressionLevel,
+      preferredRange,
+      targetDodgeDirection,
+      counterCombo,
+      pressureLevel,
+      defensiveLevel,
+      useFeints,
+      retreatWhenLowHealth: true,
+      adaptationLevel,
+      confidenceScore: adaptationConfidence,
+      targetPatternDescription: activeTactics[0] || 'BASELINE PATROL',
+    };
+
+    const tacticalDescription =
+      targetDodgeDirection !== 'none'
+        ? `COUNTER ${targetDodgeDirection.toUpperCase()} DODGE // ${comboPatternName} PARRY`
+        : `ADAPTIVE COUNTER: ${defenseMode} + ${pressureMode}`;
 
     return {
       id: `STRAT-${Date.now().toString(36).toUpperCase()}`,
-      name: `NEURAL COUNTER v2 [${dna.archetype}]`,
+      name: `ADAPTIVE AI [LVL ${adaptationLevel}]`,
       tacticalDescription,
       activeTactics,
       counterDodge,
       interceptDodgeBias,
       defenseMode,
-      antiComboTactics,
+      antiComboTactics: counterCombo,
       targetComboPattern: comboPatternName,
       blockProbabilityOnPlayerAttack,
       counterAttackAfterBlockProbability,
       pressureMode,
       approachSpeedMultiplier,
-      attackRangeMultiplier: pressureMode === 'RELENTLESS_CHASE' ? 1.15 : 1.0,
+      attackRangeMultiplier: pressureMode === 'RELENTLESS_CHASE' ? 1.18 : 1.0,
       dodgeLeftFrequency,
       comboPatternName,
       predictabilityLevel,
       adaptationConfidence,
+      adaptationLevel,
+      aiStrategy,
     };
   }
 
@@ -118,10 +185,24 @@ export class StrategyEngine {
    * Generates a neutral default strategy when no previous match DNA is available.
    */
   public static getBaselineStrategy(): CounterStrategy {
+    const aiStrategy: AIStrategy = {
+      aggressionLevel: 0.50,
+      preferredRange: 'medium',
+      targetDodgeDirection: 'none',
+      counterCombo: false,
+      pressureLevel: 0.50,
+      defensiveLevel: 0.40,
+      useFeints: false,
+      retreatWhenLowHealth: true,
+      adaptationLevel: 0,
+      confidenceScore: 0.40,
+      targetPatternDescription: 'CALIBRATING OBSERVATIONAL SENSORS',
+    };
+
     return {
       id: 'STRAT-BASELINE',
       name: 'BASELINE COMBAT PROTOCOL',
-      tacticalDescription: 'STANDARD ENGAGEMENT CADENCE // CALIBRATING',
+      tacticalDescription: 'STANDARD ENGAGEMENT CADENCE // OBSERVING',
       activeTactics: ['STANDARD PATROL', 'BALANCED GUARD PROBABILITY'],
       counterDodge: 'NEUTRAL',
       interceptDodgeBias: null,
@@ -136,7 +217,9 @@ export class StrategyEngine {
       dodgeLeftFrequency: 0.5,
       comboPatternName: 'LIGHT-LIGHT-HEAVY',
       predictabilityLevel: 'MODERATE',
-      adaptationConfidence: 0.5,
+      adaptationConfidence: 0.45,
+      adaptationLevel: 0,
+      aiStrategy,
     };
   }
 }

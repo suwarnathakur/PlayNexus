@@ -4,8 +4,8 @@
  * and adaptive battle intelligence.
  */
 
-export type PreferredDodgeDirection = 'left' | 'right' | 'backward' | 'forward' | 'balanced';
-export type PreferredCombatRange = 'close' | 'mid' | 'far';
+export type PreferredDodgeDirection = 'left' | 'right' | 'mixed' | 'backward' | 'forward' | 'balanced';
+export type PreferredCombatRange = 'close' | 'medium' | 'long' | 'mid' | 'far';
 export type FighterArchetype =
   | 'BERSERKER'
   | 'TURTLE'
@@ -13,28 +13,42 @@ export type FighterArchetype =
   | 'TACTICIAN'
   | 'BALANCED_STRIKER';
 
-export interface FightingDNAProfile {
+/**
+ * Exact FightingDNA contract requested by PLAYNEXUS specification
+ */
+export interface FightingDNA {
+  aggression: number;
+  defense: number;
+  mobility: number;
+
+  preferredDodge: 'left' | 'right' | 'mixed';
+  dodgeLeftFrequency: number;
+  dodgeRightFrequency: number;
+
+  preferredRange: 'close' | 'medium' | 'long';
+  averageComboLength: number;
+  repeatedCombos: string[];
+
+  attackFrequency: number;
+  blockFrequency: number;
+
+  strengths: string[];
+  weaknesses: string[];
+
+  predictabilityIndex: number;
+}
+
+/**
+ * Extended FightingDNAProfile preserving compatibility with historical telemetry views
+ */
+export interface FightingDNAProfile extends FightingDNA {
   id: string;
   timestamp: number;
   archetype: FighterArchetype;
 
-  // Normalized Pillars (0.00 to 1.00)
-  aggression: number;
-  defense: number;
-  mobility: number;
-  predictabilityIndex: number;
-
-  // Biometric & Tactical Profiling
+  // Additional Biometric & Tactical Profiling
   reactionTime: number; // in seconds (e.g. 0.28)
-  preferredDodge: PreferredDodgeDirection;
-  preferredRange: PreferredCombatRange;
-  averageComboLength: number;
-
-  // Tactical Breakdown
   topPatterns: string[];
-  repeatedCombos: string[];
-  strengths: string[];
-  weaknesses: string[];
 
   // Statistical Context
   totalAttacks: number;

@@ -32,7 +32,7 @@ export const DEFAULT_FIGHTING_DNA: FightingDNAProfile = {
   predictabilityIndex: 0.56,
   reactionTime: 0.24,
   preferredDodge: 'left',
-  preferredRange: 'mid',
+  preferredRange: 'medium',
   averageComboLength: 2.4,
   topPatterns: [
     'Methodical Mid-Range Stance',
@@ -49,7 +49,11 @@ export const DEFAULT_FIGHTING_DNA: FightingDNAProfile = {
     'Recovery timing is readable after heavy combos',
   ],
   totalAttacks: 18,
+  attackFrequency: 0.82,
+  blockFrequency: 0.38,
   accuracyPercentage: 68,
+  dodgeLeftFrequency: 0.58,
+  dodgeRightFrequency: 0.42,
   dodgeLeftPercentage: 58,
   dodgeRightPercentage: 42,
 };

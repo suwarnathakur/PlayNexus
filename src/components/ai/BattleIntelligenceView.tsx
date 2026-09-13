@@ -68,7 +68,7 @@ export const BattleIntelligenceView: React.FC<BattleIntelligenceViewProps> = ({
   const timingScore = Math.max(0.15, Math.min(1.0, 1.15 - (dna.reactionTime || 0.28) * 2));
 
   // Range score normalized (0.1 to 1.0)
-  const rangeScore = dna.preferredRange === 'close' ? 0.9 : dna.preferredRange === 'mid' ? 0.65 : 0.4;
+  const rangeScore = dna.preferredRange === 'close' ? 0.9 : dna.preferredRange === 'medium' || (dna.preferredRange as any) === 'mid' ? 0.65 : 0.4;
 
   // Radar Chart Geometry (5 axes)
   const cx = 160;
@@ -117,7 +117,7 @@ export const BattleIntelligenceView: React.FC<BattleIntelligenceViewProps> = ({
     : 'LIGHT-LIGHT-HEAVY — 68%';
 
   const rangePatternText =
-    dna.preferredRange === 'far'
+    dna.preferredRange === 'long' || (dna.preferredRange as any) === 'far'
       ? 'LONG RANGE PREFERENCE'
       : dna.preferredRange === 'close'
       ? 'CLOSE-QUARTERS AGGRESSOR'

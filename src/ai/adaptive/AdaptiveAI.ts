@@ -6,19 +6,22 @@ import { StrategyEngine } from './StrategyEngine';
 
 export interface AdaptiveTacticalEvent {
   text: string;
-  type: 'INTERCEPT_DODGE' | 'COMBO_PARRY' | 'RUSHDOWN' | 'HIGH_GUARD';
+  type: 'INTERCEPT_DODGE' | 'COMBO_PARRY' | 'RUSHDOWN' | 'HIGH_GUARD' | 'FEINT_STRIKE';
   timestamp: number;
 }
 
 /**
  * PLAYNEXUS Adaptive AI Controller
  * Injects counter-strategy modifications directly into the finite state machine,
- * altering state transitions, movement velocities, and counter-attack timing.
+ * strictly abiding by the 5-tier Decision Priority hierarchy and fair reaction delays.
  */
 export class AdaptiveAI {
   private strategy: CounterStrategy;
   private lastCounterEvent: AdaptiveTacticalEvent | null = null;
   private onTacticalTrigger?: (event: AdaptiveTacticalEvent) => void;
+
+  // Configurable Human-Like Reaction Delay (in ms) - Prevents frame-0 psychic cheats
+  private reactionDelayMs: number = 280;
 
   constructor(strategy?: CounterStrategy, onTacticalTrigger?: (event: AdaptiveTacticalEvent) => void) {
     this.strategy = strategy || StrategyEngine.getBaselineStrategy();
@@ -33,6 +36,14 @@ export class AdaptiveAI {
     return this.strategy;
   }
 
+  public getReactionDelay(): number {
+    return this.reactionDelayMs;
+  }
+
+  public setReactionDelay(ms: number): void {
+    this.reactionDelayMs = Math.max(100, Math.min(600, ms));
+  }
+
   public getLastTacticalEvent(): AdaptiveTacticalEvent | null {
     return this.lastCounterEvent;
   }
@@ -45,7 +56,13 @@ export class AdaptiveAI {
 
   /**
    * Adaptive Decision Function
-   * Overrides base FSM transitions with counter-strategy heuristics.
+   *
+   * DECISION PRIORITY HIERARCHY:
+   * 1. SURVIVAL (Low Health -> Disengage / Guard)
+   * 2. IMMEDIATE COMBAT SITUATION (Incoming Attack Defense)
+   * 3. PLAYER PATTERN (Dodge Intercept / Combo Prediction)
+   * 4. COUNTER-STRATEGY (Rushdown / High Guard / Feints)
+   * 5. GENERAL AI BEHAVIOR (Standard Range / Neutral FSM)
    */
   public decideNextState(
     ctx: AICombatContext,
@@ -57,7 +74,26 @@ export class AdaptiveAI {
     const isWithinRange = ctx.distanceToPlayer <= effectiveAttackRange;
     const roll = Math.random();
 
-    // 1. ADAPTATION: Anti-Combo / High-Guard Defense against Incoming Attacks
+    // ==========================================
+    // PRIORITY 1: SURVIVAL
+    // If AI is about to die, survival strictly takes precedence over offensive counters.
+    // ==========================================
+    if (isLowHealth) {
+      if (isWithinRange) {
+        // High survival instinct: 55% retreat, 35% guard, 10% desperate swipe
+        if (roll < 0.55) return 'RETREAT';
+        if (roll < 0.90) return 'BLOCK';
+        return 'ATTACK';
+      } else {
+        if (roll < 0.75) return 'RETREAT';
+        return 'IDLE';
+      }
+    }
+
+    // ==========================================
+    // PRIORITY 2: IMMEDIATE COMBAT SITUATION
+    // Player is currently swinging at the AI: evaluate guard or emergency evasion.
+    // ==========================================
     if (ctx.isPlayerAttacking) {
       const isComboStreak = (extra?.playerComboCount || 0) >= 2;
       const blockChance = isComboStreak && this.strategy.antiComboTactics
@@ -65,65 +101,74 @@ export class AdaptiveAI {
         : this.strategy.blockProbabilityOnPlayerAttack;
 
       if (roll < blockChance) {
-        this.triggerTacticalNotice(
-          `COUNTER ACTIVE: ${this.strategy.targetComboPattern || 'COMBO'} PARRIED!`,
-          'COMBO_PARRY'
-        );
+        if (isComboStreak && this.strategy.antiComboTactics) {
+          this.triggerTacticalNotice(
+            `COUNTER ACTIVE: ${this.strategy.targetComboPattern || 'COMBO'} PARRIED!`,
+            'COMBO_PARRY'
+          );
+        }
         return 'BLOCK';
       }
 
-      // If not blocking, try an evasive dodge 50% of remainder
-      if (roll < blockChance + 0.35) {
+      // Evasive dodge fallback (30% of remaining chance)
+      if (roll < blockChance + 0.30) {
         return 'DODGE';
       }
     }
 
-    // 2. ADAPTATION: Intercepting Player Dodges
+    // ==========================================
+    // PRIORITY 3: PLAYER PATTERN
+    // Exploit learned habits: directional dodge intercept or combo cadence.
+    // ==========================================
     if (extra?.isPlayerDodging && isWithinRange) {
       if (this.strategy.counterDodge === 'COUNTER_LEFT') {
-        this.triggerTacticalNotice('COUNTER ACTIVE: INTERCEPTING LEFT DODGE!', 'INTERCEPT_DODGE');
-        return 'ATTACK'; // strike into the roll!
+        this.triggerTacticalNotice('COUNTER ACTIVE: INTERCEPTING LEFT ESCAPE PATH!', 'INTERCEPT_DODGE');
+        return 'ATTACK'; // Strike into the predicted escape path!
       } else if (this.strategy.counterDodge === 'COUNTER_RIGHT') {
-        this.triggerTacticalNotice('COUNTER ACTIVE: INTERCEPTING RIGHT DODGE!', 'INTERCEPT_DODGE');
+        this.triggerTacticalNotice('COUNTER ACTIVE: INTERCEPTING RIGHT ESCAPE PATH!', 'INTERCEPT_DODGE');
         return 'ATTACK';
       }
     }
 
-    // 3. Low Health Rules
-    if (isLowHealth) {
-      if (isWithinRange) {
-        if (roll < 0.40) return 'RETREAT';
-        if (roll < 0.80) return 'BLOCK';
-        return 'ATTACK';
-      } else {
-        if (roll < 0.65) return 'RETREAT';
-        return 'IDLE';
-      }
-    }
+    // ==========================================
+    // PRIORITY 4: COUNTER-STRATEGY
+    // Apply strategic modifications based on player style (Rushdown, High Guard, Feints).
+    // ==========================================
 
-    // 4. ADAPTATION: Relentless Pressure when Player Retreats / Backs Away
+    // A. Long-Range Opponent: Relentless sprint to corner and eliminate distance
     if (!isWithinRange) {
       if (this.strategy.pressureMode === 'RELENTLESS_CHASE') {
-        // Zero idle time; 98% chase sprint
+        this.triggerTacticalNotice('RUSHDOWN ACTIVE: ELIMINATING STANDOFF DISTANCE', 'RUSHDOWN');
         return 'APPROACH';
       } else if (this.strategy.defenseMode === 'HIGH_GUARD') {
-        // More patient approach, 70% approach, 30% stand ground
-        return roll < 0.70 ? 'APPROACH' : 'IDLE';
+        // Patient spacing: 65% approach, 35% hold ground
+        return roll < 0.65 ? 'APPROACH' : 'IDLE';
       } else {
         return roll < 0.85 ? 'APPROACH' : 'IDLE';
       }
     }
 
-    // 5. In Melee Range Neutral Decisions
-    // If AI is in High Guard mode, favor defensive block and counter-punish
+    // B. Feint tactic against turtle/defensive players
+    if (this.strategy.aiStrategy?.useFeints && isWithinRange) {
+      if (roll < 0.35) {
+        this.triggerTacticalNotice('FEINT STRIKE: DISRUPTING GUARD TIMING', 'FEINT_STRIKE');
+        return 'DODGE'; // Feint reposition before strike
+      }
+    }
+
+    // C. High-Guard Stance against hyper-aggressive players (bait whiff)
     if (this.strategy.defenseMode === 'HIGH_GUARD') {
-      if (roll < 0.45) return 'BLOCK';
-      if (roll < 0.80) return 'ATTACK';
-      if (roll < 0.95) return 'DODGE';
+      this.triggerTacticalNotice('HIGH GUARD: ABSORBING RUSH TO PUNISH RECOVERY', 'HIGH_GUARD');
+      if (roll < 0.50) return 'BLOCK';
+      if (roll < 0.82) return 'ATTACK';
+      if (roll < 0.94) return 'DODGE';
       return 'IDLE';
     }
 
-    // Standard in-range options
+    // ==========================================
+    // PRIORITY 5: GENERAL AI BEHAVIOR
+    // Neutral in-range combat options.
+    // ==========================================
     if (roll < 0.52) return 'ATTACK';
     if (roll < 0.76) return 'BLOCK';
     if (roll < 0.90) return 'DODGE';
@@ -160,10 +205,10 @@ export class AdaptiveAI {
 
     // If intercepting left dodge, apply perpendicular bias toward player's left
     if (this.strategy.interceptDodgeBias === 'left') {
-      const flank = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(0.35);
+      const flank = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(0.40);
       return dir.add(flank).normalize();
     } else if (this.strategy.interceptDodgeBias === 'right') {
-      const flank = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(0.35);
+      const flank = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(0.40);
       return dir.add(flank).normalize();
     }
 

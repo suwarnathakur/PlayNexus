@@ -1021,16 +1021,50 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     }
   }, [adaptiveStrategy]);
 
-  // Subscribe to live telemetry updates
+  // Dynamic Mid-Match Action Counter & Lock Challenge Trigger Ref
+  const actionCounterRef = useRef<number>(0);
+  const hasTriggeredLockInRef = useRef<boolean>(false);
+
+  // Subscribe to live telemetry updates & trigger dynamic mid-match adaptation every 10 actions
   useEffect(() => {
     const collector = telemetryCollectorRef.current;
-    const unsubscribe = collector.subscribe((_, metrics) => {
-      updateLiveState([...collector.getRecentEvents(30)], metrics);
+    const unsubscribe = collector.subscribe((event, metrics) => {
+      const recent = collector.getRecentEvents(40);
+      updateLiveState([...recent], metrics);
+
+      // Rule 14: Dynamic Mid-Match Adaptation every 10 combat actions
+      if (['attack', 'dodge', 'block'].includes(event.action) && !isVictory && !isDefeat) {
+        actionCounterRef.current += 1;
+        if (actionCounterRef.current >= 10) {
+          actionCounterRef.current = 0;
+          const updatedStrat = useTelemetryStore.getState().midMatchAdapt(recent);
+          if (adaptiveAIRef.current) {
+            adaptiveAIRef.current.setStrategy(updatedStrat);
+          }
+
+          // Rule 24: Connect Adaptive AI to Dodge Direction Lock Challenge
+          // If preferredDodge = LEFT, confidence > 0.75, predictability > 0.70
+          if (
+            !hasTriggeredLockInRef.current &&
+            updatedStrat.dodgeLeftFrequency >= 0.70 &&
+            updatedStrat.adaptationConfidence >= 0.75 &&
+            (updatedStrat.predictabilityLevel === 'HIGH' || updatedStrat.adaptationLevel >= 2) &&
+            dodgeLockManagerRef.current.getState() === 'IDLE'
+          ) {
+            hasTriggeredLockInRef.current = true;
+            dodgeLockManagerRef.current.triggerPattern(
+              'left',
+              'right',
+              Math.round(updatedStrat.dodgeLeftFrequency * 100)
+            );
+          }
+        }
+      }
     });
     // Prime initial metrics
     updateLiveState(collector.getRecentEvents(30), collector.getLiveMetrics());
     return unsubscribe;
-  }, [updateLiveState]);
+  }, [updateLiveState, isVictory, isDefeat]);
 
   // Dodge Direction Lock Manager & State
   const dodgeLockManagerRef = useRef<DodgeLockManager>(new DodgeLockManager());
@@ -1714,6 +1748,15 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     setIsEnemyHit(false);
     aiControllerRef.current.reset();
     dodgeLockManagerRef.current.reset();
+    actionCounterRef.current = 0;
+    hasTriggeredLockInRef.current = false;
+
+    // Load persistent counter strategy learned from previous match
+    const persistentStrat = useTelemetryStore.getState().counterStrategy;
+    if (adaptiveAIRef.current) {
+      adaptiveAIRef.current.setStrategy(persistentStrat);
+    }
+
     setIsPlayerAttacking(false);
     setIsPlayerBlocking(false);
     setIsPlayerDodging(false);
@@ -1886,6 +1929,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       <AdaptiveAIHUD
         strategy={adaptiveStrategy}
         tacticalEvent={adaptiveTacticalEvent}
+        aiState={isVictory ? 'DEFEATED' : aiCurrentState}
       />
 
       {/* Dodge Direction Lock Cinematic Challenge Overlay */}

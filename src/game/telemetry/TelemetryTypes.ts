@@ -15,10 +15,30 @@ export type TelemetryActionType =
 
 export type DodgeDirection = 'left' | 'right' | 'forward' | 'backward' | 'neutral';
 
+export interface PlayerAction {
+  type: 'attack' | 'block' | 'dodge' | 'move' | 'special';
+  timestamp: number;
+  direction?: 'left' | 'right' | 'forward' | 'backward';
+  attackType?: 'light' | 'heavy';
+  successful?: boolean;
+  position?: {
+    x: number;
+    y: number;
+    z: number;
+  };
+}
+
 export interface TelemetryEvent {
   id: string;
   action: TelemetryActionType;
   direction?: DodgeDirection;
+  attackType?: 'light' | 'heavy';
+  successful?: boolean;
+  position?: {
+    x: number;
+    y: number;
+    z: number;
+  };
   timestamp: number; // Unix timestamp in ms
   intervalSinceLastAction?: number; // ms since previous action
   combo?: number;

@@ -1,10 +1,5 @@
 import type { MatchTelemetry } from '../../game/telemetry/TelemetryTypes';
-import type {
-  FightingDNAProfile,
-  PreferredDodgeDirection,
-  PreferredCombatRange,
-  FighterArchetype,
-} from './DNATypes';
+import type { FightingDNAProfile, FighterArchetype } from './DNATypes';
 
 /**
  * PLAYNEXUS DNA Analyzer
@@ -93,33 +88,29 @@ export class DNAAnalyzer {
     );
 
     // 3. Preferred Dodge Direction
-    let preferredDodge: PreferredDodgeDirection = 'balanced';
+    let preferredDodge: 'left' | 'right' | 'mixed' = 'mixed';
     const dodgeLeftPct = dodgeCount > 0 ? Math.round((dodgeLeftCount / dodgeCount) * 100) : 50;
     const dodgeRightPct = dodgeCount > 0 ? Math.round((dodgeRightCount / dodgeCount) * 100) : 50;
 
-    if (dodgeLeftPct >= 55) {
+    if (dodgeLeftPct >= 65) {
       preferredDodge = 'left';
-    } else if (dodgeRightPct >= 55) {
+    } else if (dodgeRightPct >= 65) {
       preferredDodge = 'right';
-    } else if (dodgeBackwardCount >= Math.max(dodgeLeftCount, dodgeRightCount) && dodgeCount >= 2) {
-      preferredDodge = 'backward';
-    } else if (dodgeForwardCount >= Math.max(dodgeLeftCount, dodgeRightCount) && dodgeCount >= 2) {
-      preferredDodge = 'forward';
     } else {
-      preferredDodge = 'balanced';
+      preferredDodge = 'mixed';
     }
 
     // 4. Preferred Combat Range
-    let preferredRange: PreferredCombatRange = 'close';
+    let preferredRange: 'close' | 'medium' | 'long' = 'close';
     const avgAttackDist =
       attackDistanceSamples > 0 ? totalAttackDistance / attackDistanceSamples : 1.8;
 
-    if (avgAttackDist <= 1.5) {
+    if (avgAttackDist <= 2.2) {
       preferredRange = 'close';
-    } else if (avgAttackDist <= 2.2) {
-      preferredRange = 'mid';
+    } else if (avgAttackDist <= 4.2) {
+      preferredRange = 'medium';
     } else {
-      preferredRange = 'far';
+      preferredRange = 'long';
     }
 
     // 5. Average Combo Length
@@ -282,8 +273,12 @@ export class DNAAnalyzer {
       strengths,
       weaknesses,
       totalAttacks: attackCount,
+      attackFrequency: Number((attackCount / validDuration).toFixed(2)),
+      blockFrequency: Number((blockCount / validDuration).toFixed(2)),
       accuracyPercentage:
         attackCount > 0 ? Math.round((hitCount / attackCount) * 100) : 0,
+      dodgeLeftFrequency: Number((dodgeLeftPct / 100).toFixed(2)),
+      dodgeRightFrequency: Number((dodgeRightPct / 100).toFixed(2)),
       dodgeLeftPercentage: dodgeLeftPct,
       dodgeRightPercentage: dodgeRightPct,
     };

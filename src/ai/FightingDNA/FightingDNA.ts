@@ -74,7 +74,11 @@ export class FightingDNA {
         'Guard drop following rapid combo completions',
       ],
       totalAttacks: 12,
+      attackFrequency: 0.8,
+      blockFrequency: 0.3,
       accuracyPercentage: 68,
+      dodgeLeftFrequency: 0.6,
+      dodgeRightFrequency: 0.4,
       dodgeLeftPercentage: 60,
       dodgeRightPercentage: 40,
     };
