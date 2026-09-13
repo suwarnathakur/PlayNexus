@@ -22,7 +22,7 @@ import { DodgeLockOverlay } from './DodgeLockOverlay';
 import { useVoiceCommands } from '../../hooks/useVoiceCommands';
 import { useDemoStore } from '../../demo/demoStore';
 import { DEMO_COUNTER_STRATEGY } from '../../demo/demoData';
-import { useCostumeStore, type CombatStyle } from '../../store/costumeStore';
+import { useCostumeStore, type CombatStyle, type StageTheme } from '../../store/costumeStore';
 
 import { FoxCharacter3D } from '../3d/FoxCharacter3D';
 import { ArcherCharacter3D } from '../3d/ArcherCharacter3D';
@@ -279,6 +279,8 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
   const wasMoving = useRef(false);
 
   useFrame((state, delta) => {
+    if (!groupRef.current) return;
+
     if (isDead) {
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, -Math.PI / 2, delta * 6);
       groupRef.current.position.y = THREE.MathUtils.lerp(groupRef.current.position.y, 0.25, delta * 6);

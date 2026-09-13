@@ -597,7 +597,7 @@ export const CharacterSelect: React.FC = () => {
               className="cyber-panel"
               style={{
                 position: 'relative',
-                height: '380px',
+                height: '420px',
                 borderRadius: '20px',
                 background: 'rgba(10, 15, 26, 0.85)',
                 border: `1px solid ${selectedStyle.accentColor}50`,
