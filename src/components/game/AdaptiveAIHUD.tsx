@@ -18,9 +18,17 @@ export const AdaptiveAIHUD: React.FC<AdaptiveAIHUDProps> = ({
   return (
     <aside
       aria-label="AI Adaptive Telemetry Feed"
-      className="fixed top-20 right-4 z-30 max-w-xs w-full font-mono text-xs select-none pointer-events-none"
+      style={{
+        position: 'fixed',
+        top: '135px',
+        right: '32px',
+        width: '280px',
+        zIndex: 35,
+        pointerEvents: 'none',
+      }}
+      className="font-mono text-xs select-none"
     >
-      <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-rose-500/40 backdrop-blur-md shadow-[0_0_25px_rgba(255,0,85,0.18)] space-y-2.5">
+      <div className="p-3.5 rounded-2xl bg-slate-950/95 border border-rose-500/50 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.7)] space-y-2.5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-rose-500/30 pb-2">
           <div className="flex items-center gap-2">

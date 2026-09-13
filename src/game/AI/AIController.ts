@@ -88,6 +88,17 @@ export class AIController {
     // Decrement state timer
     this.stateTimeRemaining -= delta;
 
+    // Physical collision separation — prevent fighter models from overlapping/clipping
+    if (distanceToPlayer < 1.45 && distanceToPlayer > 0.001) {
+      const sepDir = new THREE.Vector3().subVectors(enemyPos, playerPos).setY(0);
+      if (sepDir.length() > 0.01) {
+        sepDir.normalize();
+        const pushDist = (1.45 - distanceToPlayer) * 0.5;
+        enemyPos.x += sepDir.x * pushDist;
+        enemyPos.z += sepDir.z * pushDist;
+      }
+    }
+
     // Handle Active State Behaviors
     switch (this.currentState) {
       case 'APPROACH': {
@@ -96,13 +107,24 @@ export class AIController {
           ? this.adaptiveAI.calculateInterceptVector(enemyPos, playerPos)
           : new THREE.Vector3().subVectors(playerPos, enemyPos).setY(0);
 
-        if (dir.length() > 0.05) {
+        const currentDist = enemyPos.distanceTo(playerPos);
+        const MIN_COMBAT_DISTANCE = 1.85; // Maintain combat spacing — don't walk inside player!
+
+        if (currentDist > MIN_COMBAT_DISTANCE && dir.length() > 0.05) {
           dir.normalize();
           const effectiveSpeed = this.adaptiveAI
             ? this.adaptiveAI.getApproachSpeed(this.approachSpeed)
             : this.approachSpeed;
           enemyPos.x += dir.x * effectiveSpeed * delta;
           enemyPos.z += dir.z * effectiveSpeed * delta;
+        } else if (currentDist < 1.45) {
+          // Push away slightly to prevent model clipping
+          const pushAway = new THREE.Vector3().subVectors(enemyPos, playerPos).setY(0);
+          if (pushAway.length() > 0.01) {
+            pushAway.normalize();
+            enemyPos.x += pushAway.x * 2.2 * delta;
+            enemyPos.z += pushAway.z * 2.2 * delta;
+          }
         }
         break;
       }

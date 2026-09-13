@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import confetti from 'canvas-confetti';
 import { useNavigate } from 'react-router-dom';
 import { CombatHUD } from './CombatHUD';
-import { ArenaStadium } from '../3d/ArenaStadium';
 import { useKeyboardControls } from '../../hooks/useKeyboardControls';
 import { useSound } from '../../hooks/useSound';
 import { AIController } from '../../game/AI/AIController';
@@ -114,6 +113,7 @@ const LaserBolt: React.FC<LaserBoltProps> = ({ from, to, color = '#ff4444' }) =>
  */
 interface PlayerFighterProps {
   position: React.MutableRefObject<THREE.Vector3>;
+  enemyPosition?: React.MutableRefObject<THREE.Vector3>;
   isDead: boolean;
   isAttacking: boolean;
   isBlocking: boolean;
@@ -125,6 +125,7 @@ interface PlayerFighterProps {
 
 const PlayerFighter: React.FC<PlayerFighterProps> = ({
   position,
+  enemyPosition,
   isDead,
   isAttacking,
   isBlocking,
@@ -163,8 +164,21 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       const speedMultiplier = isBlocking ? 0.3 : 1.0;
       const moveStep = MOVEMENT_SPEED * speedMultiplier * delta;
 
-      position.current.x += moveDir.x * moveStep;
-      position.current.z += moveDir.y * moveStep;
+      const nextX = position.current.x + moveDir.x * moveStep;
+      const nextZ = position.current.z + moveDir.y * moveStep;
+
+      // Soft collision separation: do not allow moving directly inside enemy model
+      if (enemyPosition) {
+        const curDist = Math.hypot(position.current.x - enemyPosition.current.x, position.current.z - enemyPosition.current.z);
+        const nextDist = Math.hypot(nextX - enemyPosition.current.x, nextZ - enemyPosition.current.z);
+        if (nextDist >= 1.45 || nextDist > curDist) {
+          position.current.x = nextX;
+          position.current.z = nextZ;
+        }
+      } else {
+        position.current.x = nextX;
+        position.current.z = nextZ;
+      }
 
       targetRotation.current = Math.atan2(moveDir.x, moveDir.y);
     }
@@ -184,16 +198,17 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
       delta * 12
     );
 
-    // 4. Stance Elevation
+    // 4. Stance Elevation (Arena floor surface is at y = 0.22; characters stand ON it)
     const t = state.clock.getElapsedTime();
+    const FLOOR_Y = 0.22;
     if (isDodging) {
-      position.current.y = 0.08;
+      position.current.y = FLOOR_Y + 0.05;
     } else if (isBlocking) {
-      position.current.y = 0.16;
+      position.current.y = FLOOR_Y + 0.02;
     } else if (movingNow) {
-      position.current.y = 0.2 + Math.abs(Math.sin(t * 12)) * 0.05;
+      position.current.y = FLOOR_Y + 0.03 + Math.abs(Math.sin(t * 12)) * 0.04;
     } else {
-      position.current.y = 0.2 + Math.sin(t * 3) * 0.03;
+      position.current.y = FLOOR_Y + 0.02 + Math.sin(t * 3) * 0.02;
     }
 
     groupRef.current.position.copy(position.current);
@@ -305,10 +320,11 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
     );
 
     const t = state.clock.getElapsedTime();
+    const FLOOR_Y = 0.22;
     if (aiState === 'IDLE') {
-      position.current.y = 0.2 + Math.sin(t * 2.8 + 1.2) * 0.03;
+      position.current.y = FLOOR_Y + 0.02 + Math.sin(t * 2.8 + 1.2) * 0.02;
     } else {
-      position.current.y = 0.2;
+      position.current.y = FLOOR_Y + 0.02;
     }
 
     groupRef.current.position.copy(position.current);
@@ -319,7 +335,7 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
   const isDodging = aiControllerRef.current.isDodging();
 
   return (
-    <group ref={groupRef} position={[2.5, 0.2, 0]}>
+    <group ref={groupRef} position={[2.5, 0.22, 0]}>
       <FoxCharacter3D
         variant="falco"
         isAttacking={isAttacking}
@@ -334,26 +350,34 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
 };
 
 /**
- * Third-Person Following Camera
+ * Dynamic 3D Combat Camera — frames both fighters and avoids occlusion
  */
 interface FollowCameraProps {
   playerPosition: [number, number, number];
+  enemyPosition?: [number, number, number];
 }
 
-const FollowCamera: React.FC<FollowCameraProps> = ({ playerPosition }) => {
+const FollowCamera: React.FC<FollowCameraProps> = ({ playerPosition, enemyPosition }) => {
   useFrame((state, delta) => {
+    const ep = enemyPosition || [playerPosition[0] + 3.5, playerPosition[1], playerPosition[2]];
+    const midX = (playerPosition[0] + ep[0]) * 0.5;
+    const midZ = (playerPosition[2] + ep[2]) * 0.5;
+    const distBetween = Math.hypot(playerPosition[0] - ep[0], playerPosition[2] - ep[2]);
+
+    // Zoom slightly dynamically with distance between fighters
+    const zoomDist = Math.max(6.5, Math.min(8.8, 5.8 + distBetween * 0.35));
     const desiredPos = new THREE.Vector3(
-      playerPosition[0] * 0.65,
-      3.8,
-      playerPosition[2] * 0.65 + 7.2
+      midX * 0.45,
+      3.2,
+      midZ * 0.45 + zoomDist
     );
 
-    state.camera.position.lerp(desiredPos, delta * 5);
+    state.camera.position.lerp(desiredPos, delta * 4);
 
     const lookTarget = new THREE.Vector3(
-      playerPosition[0] * 0.4,
-      1.1,
-      playerPosition[2] * 0.4
+      midX,
+      1.3,
+      midZ
     );
 
     state.camera.lookAt(lookTarget);
@@ -426,8 +450,8 @@ const PlayableArenaStage: React.FC = () => {
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Ancient Sandstone Central Fighting Platform */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
+      {/* Ancient Sandstone Central Fighting Platform (flat horizontal disc on ground) */}
+      <mesh receiveShadow position={[0, 0, 0]}>
         <cylinderGeometry args={[ARENA_RADIUS + 0.5, ARENA_RADIUS + 1.2, 0.4, 64]} />
         <meshStandardMaterial color="#d6b38f" roughness={0.85} metalness={0.05} />
       </mesh>
@@ -490,9 +514,6 @@ const PlayableArenaStage: React.FC = () => {
           </mesh>
         </group>
       ))}
-
-      {/* Grand Amphitheater & Colosseum Seating in the background */}
-      <ArenaStadium />
     </group>
   );
 };
@@ -1189,8 +1210,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           </>
         ) : (
           <>
+            <color attach="background" args={['#9fc5ec']} />
             <Sky sunPosition={[100, 45, 100]} inclination={0.6} azimuth={0.25} turbidity={8} rayleigh={1.2} />
-            <fog attach="fog" args={['#c8d6e5', 50, 190]} />
+            <fog attach="fog" args={['#c8d6e5', 45, 160]} />
             <ambientLight intensity={0.9} color="#ffffff" />
             <hemisphereLight groundColor="#d4b28c" color="#dbeafe" intensity={0.7} />
             <directionalLight position={[40, 60, 40]} intensity={2.2} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
@@ -1217,12 +1239,16 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           <LaserBolt key={bolt.id} from={bolt.from} to={bolt.to} color={bolt.color} />
         ))}
 
-        {/* Camera Follow */}
-        <FollowCamera playerPosition={playerCoordinates} />
+        {/* Camera Follow — frames both fighters dynamically */}
+        <FollowCamera
+          playerPosition={playerCoordinates}
+          enemyPosition={[enemyPosRef.current.x, enemyPosRef.current.y, enemyPosRef.current.z]}
+        />
 
         {/* Player Fighter */}
         <PlayerFighter
           position={playerPosRef}
+          enemyPosition={enemyPosRef}
           isDead={isDefeat}
           isAttacking={isPlayerAttacking}
           isBlocking={isPlayerBlocking}

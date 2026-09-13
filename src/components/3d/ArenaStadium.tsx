@@ -29,10 +29,6 @@ export const ArenaStadium = () => {
                 side={THREE.DoubleSide} 
               />
             </mesh>
-            <mesh position={[0, height + 1.75, 0]}>
-              <cylinderGeometry args={[outerRadius, outerRadius, 3.5, 64, 1, true]} />
-              <meshStandardMaterial color="#e2e8f0" side={THREE.DoubleSide} />
-            </mesh>
           </group>
         );
       })}

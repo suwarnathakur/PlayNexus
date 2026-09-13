@@ -123,7 +123,7 @@ const StadiumSeating: React.FC = () => {
 const ArenaStage: React.FC = () => {
   return (
     <group position={[0, 0, 0]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
+      <mesh receiveShadow position={[0, 0, 0]}>
         <cylinderGeometry args={[7.5, 8.2, 0.4, 64]} />
         <meshStandardMaterial color="#d6b38f" roughness={0.8} metalness={0.1} />
       </mesh>

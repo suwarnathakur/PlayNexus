@@ -23,7 +23,7 @@ export const TelemetryDebugPanel: React.FC<TelemetryDebugPanelProps> = ({
   metrics,
   onClear,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'STREAM' | 'METRICS'>('STREAM');
 
   const recentEvents = events.slice(-10).reverse();
@@ -49,11 +49,23 @@ export const TelemetryDebugPanel: React.FC<TelemetryDebugPanelProps> = ({
   };
 
   return (
-    <div className="fixed bottom-4 left-4 z-40 max-w-sm w-full font-mono text-xs select-none">
+    <div
+      style={{
+        position: 'fixed',
+        bottom: '96px',
+        left: '32px',
+        width: '280px',
+        zIndex: 40,
+        userSelect: 'none',
+      }}
+      className="font-mono text-xs"
+    >
       {/* Header bar / Minimize toggle */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between px-3 py-2 bg-slate-950/90 border border-cyan-500/40 rounded-t-xl cursor-pointer hover:bg-slate-900 transition-colors shadow-lg backdrop-blur-md"
+        className={`flex items-center justify-between px-3 py-2 bg-slate-950/95 border border-cyan-500/40 ${
+          isExpanded ? 'rounded-t-xl' : 'rounded-xl'
+        } cursor-pointer hover:bg-slate-900 transition-all shadow-xl backdrop-blur-md`}
       >
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
