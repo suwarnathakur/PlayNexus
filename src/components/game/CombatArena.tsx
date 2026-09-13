@@ -120,13 +120,15 @@ export interface PlasmaArrowData {
   color: string;
   damage: number;
   isSpecial?: boolean;
+  isFromEnemy?: boolean;
 }
 
 const PlasmaArrowMesh: React.FC<{
   arrow: PlasmaArrowData;
-  onImpact: (arrowId: number, hitPos?: [number, number, number]) => void;
+  onImpact: (arrowId: number, hitPos?: [number, number, number], isFromEnemy?: boolean) => void;
   enemyPosRef: React.MutableRefObject<THREE.Vector3>;
-}> = ({ arrow, onImpact, enemyPosRef }) => {
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+}> = ({ arrow, onImpact, enemyPosRef, playerPosRef }) => {
   const meshRef = useRef<THREE.Group>(null);
   const curPos = useRef(new THREE.Vector3(...arrow.start));
   const dirVec = useMemo(() => new THREE.Vector3(...arrow.dir).normalize(), [arrow.dir]);
@@ -139,20 +141,31 @@ const PlasmaArrowMesh: React.FC<{
     life.current += delta;
     if (life.current > maxLife) {
       hasImpacted.current = true;
-      onImpact(arrow.id);
+      onImpact(arrow.id, undefined, arrow.isFromEnemy);
       return;
     }
 
     curPos.current.addScaledVector(dirVec, arrow.speed * delta);
     meshRef.current.position.copy(curPos.current);
 
-    // Collision check against enemy target hitbox
-    const distToEnemy = curPos.current.distanceTo(
-      new THREE.Vector3(enemyPosRef.current.x, enemyPosRef.current.y + 0.8, enemyPosRef.current.z)
-    );
-    if (distToEnemy < 1.3) {
-      hasImpacted.current = true;
-      onImpact(arrow.id, [curPos.current.x, curPos.current.y, curPos.current.z]);
+    if (arrow.isFromEnemy) {
+      // Check collision against Player hitbox
+      const distToPlayer = curPos.current.distanceTo(
+        new THREE.Vector3(playerPosRef.current.x, playerPosRef.current.y + 0.8, playerPosRef.current.z)
+      );
+      if (distToPlayer < 1.3) {
+        hasImpacted.current = true;
+        onImpact(arrow.id, [curPos.current.x, curPos.current.y, curPos.current.z], true);
+      }
+    } else {
+      // Check collision against Enemy hitbox
+      const distToEnemy = curPos.current.distanceTo(
+        new THREE.Vector3(enemyPosRef.current.x, enemyPosRef.current.y + 0.8, enemyPosRef.current.z)
+      );
+      if (distToEnemy < 1.3) {
+        hasImpacted.current = true;
+        onImpact(arrow.id, [curPos.current.x, curPos.current.y, curPos.current.z], false);
+      }
     }
   });
 
@@ -166,12 +179,12 @@ const PlasmaArrowMesh: React.FC<{
     <group ref={meshRef} position={arrow.start} quaternion={quaternion}>
       {/* High-energy plasma beam shaft */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.022, 0.022, 1.1, 8]} />
+        <cylinderGeometry args={[0.024, 0.024, 1.15, 8]} />
         <meshBasicMaterial color={arrow.color} transparent opacity={0.95} />
       </mesh>
       {/* Arrow Broadhead Emitter */}
-      <mesh position={[0, 0, 0.55]} rotation={[Math.PI / 2, 0, 0]}>
-        <coneGeometry args={[0.07, 0.22, 8]} />
+      <mesh position={[0, 0, 0.58]} rotation={[Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.075, 0.22, 8]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
       {/* Trailing Particle Core */}
@@ -384,6 +397,7 @@ interface EnemyFighterProps {
   isPlayerDodging: boolean;
   playerComboCount: number;
   isChallengeActive: boolean;
+  selectedStyle?: CombatStyle;
 }
 
 const EnemyFighter: React.FC<EnemyFighterProps> = ({
@@ -399,6 +413,7 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
   isPlayerDodging,
   playerComboCount,
   isChallengeActive,
+  selectedStyle = 'melee',
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const [isMoving, setIsMoving] = useState(false);
@@ -433,6 +448,7 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
         isPlayerAttacking,
         isPlayerBlocking,
         arenaRadius: ARENA_RADIUS,
+        combatStyle: selectedStyle,
       },
       {
         isPlayerDodging,
@@ -476,15 +492,27 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
 
   return (
     <group ref={groupRef} position={[2.5, 0.22, 0]}>
-      <FoxCharacter3D
-        variant="falco"
-        isAttacking={isAttacking}
-        isBlocking={isBlocking}
-        isDodging={isDodging}
-        isHit={isHit}
-        isDead={isDead}
-        isMoving={isMoving}
-      />
+      {selectedStyle === 'archery' ? (
+        <ArcherCharacter3D
+          costume="red"
+          isAttacking={isAttacking}
+          isBlocking={isBlocking}
+          isDodging={isDodging}
+          isHit={isHit}
+          isDead={isDead}
+          isMoving={isMoving}
+        />
+      ) : (
+        <FoxCharacter3D
+          variant="falco"
+          isAttacking={isAttacking}
+          isBlocking={isBlocking}
+          isDodging={isDodging}
+          isHit={isHit}
+          isDead={isDead}
+          isMoving={isMoving}
+        />
+      )}
     </group>
   );
 };
@@ -571,9 +599,56 @@ const SunParticles3D: React.FC = () => {
 };
 
 /**
- * Ancient Colosseum Fighting Ground Stage with Boundary Pillars & Colonnades
+ * Floating Bioluminescent Jungle Spores & Pollen
  */
-const PlayableArenaStage: React.FC = () => {
+const JungleSporeParticles3D: React.FC = () => {
+  const pointsRef = useRef<THREE.Points>(null);
+  const count = 90;
+
+  const positions = React.useMemo(() => {
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 28;
+      pos[i * 3 + 1] = Math.random() * 8 + 0.3;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 28;
+    }
+    return pos;
+  }, [count]);
+
+  useFrame((state) => {
+    if (pointsRef.current) {
+      const t = state.clock.getElapsedTime();
+      const pos = pointsRef.current.geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < count; i++) {
+        pos[i * 3 + 1] += Math.sin(t * 0.6 + i) * 0.004;
+        pos[i * 3] += Math.cos(t * 0.3 + i) * 0.002;
+      }
+      pointsRef.current.geometry.attributes.position.needsUpdate = true;
+    }
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.09}
+        color="#34d399"
+        transparent
+        opacity={0.8}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+};
+
+/**
+ * Fighting Ground Stage with Support for Colosseum and Overgrown Cyber-Jungle Themes
+ */
+const PlayableArenaStage: React.FC<{ theme?: StageTheme }> = ({ theme = 'colosseum' }) => {
+  const isJungle = theme === 'jungle';
+
   const pylonPositions = React.useMemo(() => {
     const pylons: [number, number, number][] = [];
     const count = 16;
@@ -588,72 +663,167 @@ const PlayableArenaStage: React.FC = () => {
     return pylons;
   }, []);
 
+  // Perimeter giant ancient jungle canopy trees
+  const jungleTrees = React.useMemo(() => {
+    const trees: { pos: [number, number, number]; scale: number; height: number }[] = [];
+    const count = 11;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + 0.18;
+      const dist = 9.2 + (i % 3) * 1.5;
+      trees.push({
+        pos: [Math.cos(angle) * dist, 0, Math.sin(angle) * dist],
+        scale: 0.9 + (i % 4) * 0.2,
+        height: 7.5 + (i % 3) * 1.8,
+      });
+    }
+    return trees;
+  }, []);
+
   return (
     <group position={[0, 0, 0]}>
-      {/* Ancient Sandstone Central Fighting Platform (flat horizontal disc on ground) */}
+      {/* Central Fighting Platform */}
       <mesh receiveShadow position={[0, 0, 0]}>
         <cylinderGeometry args={[ARENA_RADIUS + 0.5, ARENA_RADIUS + 1.2, 0.4, 64]} />
-        <meshStandardMaterial color="#d6b38f" roughness={0.85} metalness={0.05} />
+        <meshStandardMaterial
+          color={isJungle ? '#142a1e' : '#d6b38f'}
+          roughness={isJungle ? 0.9 : 0.85}
+          metalness={0.05}
+        />
       </mesh>
 
-      {/* Surrounding Vast Ancient Sand Ground */}
+      {/* Surrounding Vast Ground Floor */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.11, 0]}>
         <circleGeometry args={[65, 64]} />
-        <meshStandardMaterial color="#d4b28c" roughness={0.9} />
+        <meshStandardMaterial
+          color={isJungle ? '#062016' : '#d4b28c'}
+          roughness={0.92}
+        />
       </mesh>
 
-      {/* Ancient Stone Carved Outer Boundary Ring */}
+      {/* Outer Boundary Ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
         <ringGeometry args={[ARENA_RADIUS - 0.14, ARENA_RADIUS + 0.14, 64]} />
-        <meshStandardMaterial color="#b58d63" roughness={0.8} />
+        <meshStandardMaterial
+          color={isJungle ? '#064e3b' : '#b58d63'}
+          roughness={0.8}
+        />
       </mesh>
 
-      {/* Golden Martial Border Ring */}
+      {/* Bioluminescent Rune Ring / Golden Martial Border */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.212, 0]}>
         <ringGeometry args={[ARENA_RADIUS - 0.04, ARENA_RADIUS + 0.04, 64]} />
-        <meshBasicMaterial color="#eab308" side={THREE.DoubleSide} />
+        <meshBasicMaterial
+          color={isJungle ? '#10b981' : '#eab308'}
+          side={THREE.DoubleSide}
+        />
       </mesh>
 
       {/* Inner Hazard Warning Ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
         <ringGeometry args={[3.4, 3.55, 48]} />
-        <meshBasicMaterial color="#dc2626" side={THREE.DoubleSide} transparent opacity={0.65} />
+        <meshBasicMaterial
+          color={isJungle ? '#047857' : '#dc2626'}
+          side={THREE.DoubleSide}
+          transparent
+          opacity={0.65}
+        />
       </mesh>
 
-      {/* Center Sacred Martial Arts Seal */}
+      {/* Center Sacred Seal */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
         <ringGeometry args={[1.1, 1.25, 32]} />
-        <meshBasicMaterial color="#d4af37" side={THREE.DoubleSide} transparent opacity={0.8} />
+        <meshBasicMaterial
+          color={isJungle ? '#34d399' : '#d4af37'}
+          side={THREE.DoubleSide}
+          transparent
+          opacity={0.85}
+        />
       </mesh>
 
-      {/* Subtle Sand Arena Grid Pattern */}
-      <gridHelper args={[14, 14, '#b58d63', '#d6b38f']} position={[0, 0.22, 0]} />
+      {/* Floor Grid Helper */}
+      <gridHelper
+        args={[14, 14, isJungle ? '#059669' : '#b58d63', isJungle ? '#064e3b' : '#d6b38f']}
+        position={[0, 0.22, 0]}
+      />
 
-      {/* Ancient Marble Boundary Columns with Golden Caps */}
+      {/* Perimeter Monoliths: Overgrown Totems (Jungle) or Marble Columns (Colosseum) */}
       {pylonPositions.map((pos, idx) => (
         <group key={idx} position={pos}>
           {/* Base Pedestal */}
           <mesh position={[0, -0.15, 0]} castShadow receiveShadow>
             <boxGeometry args={[0.32, 0.2, 0.32]} />
-            <meshStandardMaterial color="#d4af37" roughness={0.3} metalness={0.8} />
+            <meshStandardMaterial
+              color={isJungle ? '#0f291e' : '#d4af37'}
+              roughness={0.4}
+              metalness={isJungle ? 0.3 : 0.8}
+            />
           </mesh>
-          {/* Marble Column Shaft */}
+          {/* Column Shaft */}
           <mesh position={[0, 0.35, 0]} castShadow>
             <cylinderGeometry args={[0.1, 0.13, 0.8, 16]} />
-            <meshStandardMaterial color="#f8fafc" roughness={0.2} metalness={0.15} />
+            <meshStandardMaterial
+              color={isJungle ? '#064e3b' : '#f8fafc'}
+              roughness={isJungle ? 0.8 : 0.2}
+              metalness={0.15}
+            />
           </mesh>
-          {/* Golden Capital */}
+          {/* Capital Plate */}
           <mesh position={[0, 0.8, 0]} castShadow>
             <boxGeometry args={[0.26, 0.12, 0.26]} />
-            <meshStandardMaterial color="#d4af37" roughness={0.25} metalness={0.85} />
+            <meshStandardMaterial
+              color={isJungle ? '#047857' : '#d4af37'}
+              roughness={0.3}
+              metalness={isJungle ? 0.4 : 0.85}
+            />
           </mesh>
-          {/* Sun Crystal Top */}
+          {/* Energy Focus Crystal Top */}
           <mesh position={[0, 0.92, 0]}>
-            <sphereGeometry args={[0.08, 12, 12]} />
-            <meshStandardMaterial color="#38bdf8" emissive="#0284c7" emissiveIntensity={0.8} />
+            <sphereGeometry args={[0.085, 12, 12]} />
+            <meshStandardMaterial
+              color={isJungle ? '#34d399' : '#38bdf8'}
+              emissive={isJungle ? '#10b981' : '#0284c7'}
+              emissiveIntensity={isJungle ? 2.2 : 0.8}
+            />
           </mesh>
         </group>
       ))}
+
+      {/* ============================================================== */}
+      {/* JUNGLE CANOPY TREES & FOLIAGE (RENDERED ONLY IN JUNGLE THEME)   */}
+      {/* ============================================================== */}
+      {isJungle &&
+        jungleTrees.map((tree, i) => (
+          <group key={`tree-${i}`} position={tree.pos} scale={[tree.scale, tree.scale, tree.scale]}>
+            {/* Tree Trunk */}
+            <mesh position={[0, tree.height * 0.45, 0]} castShadow>
+              <cylinderGeometry args={[0.42, 0.72, tree.height, 10]} />
+              <meshStandardMaterial color="#1c1917" roughness={0.9} />
+            </mesh>
+            {/* Main Canopy Foliage Dome */}
+            <mesh position={[0, tree.height + 0.5, 0]} castShadow>
+              <sphereGeometry args={[2.4, 12, 10]} />
+              <meshStandardMaterial color="#047857" roughness={0.7} />
+            </mesh>
+            {/* Secondary Foliage Clump */}
+            <mesh position={[0.8, tree.height + 1.2, -0.6]} castShadow>
+              <sphereGeometry args={[1.8, 10, 8]} />
+              <meshStandardMaterial color="#065f46" roughness={0.65} />
+            </mesh>
+            <mesh position={[-0.9, tree.height + 0.8, 0.7]} castShadow>
+              <sphereGeometry args={[1.6, 10, 8]} />
+              <meshStandardMaterial color="#059669" roughness={0.65} />
+            </mesh>
+            {/* Hanging Bioluminescent Spores */}
+            <mesh position={[0.5, tree.height - 0.8, 0.5]}>
+              <sphereGeometry args={[0.12, 8, 8]} />
+              <meshStandardMaterial color="#a7f3d0" emissive="#10b981" emissiveIntensity={3.0} />
+            </mesh>
+            <mesh position={[-0.6, tree.height - 1.1, -0.4]}>
+              <sphereGeometry args={[0.1, 8, 8]} />
+              <meshStandardMaterial color="#34d399" emissive="#34d399" emissiveIntensity={2.5} />
+            </mesh>
+          </group>
+        ))}
     </group>
   );
 };
@@ -729,6 +899,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   // Costume, Stage Theme & Combat Style
   const { selectedCostume, stageTheme, selectedStyle } = useCostumeStore();
   const isArchery = selectedStyle === 'archery';
+  const effectiveStageTheme: StageTheme = isArchery ? 'jungle' : stageTheme;
 
   // Demo Mode Store State
   const {
@@ -853,6 +1024,37 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const handleAIAttackStrike = () => {
     if (isVictory || isDefeat) return;
 
+    // Archery Mode: AI fires a high-velocity Crimson Plasma Arrow
+    if (isArchery) {
+      playSound('arrow_shot');
+
+      const startPos: [number, number, number] = [
+        enemyPosRef.current.x,
+        enemyPosRef.current.y + 1.1,
+        enemyPosRef.current.z,
+      ];
+      const targetVec = new THREE.Vector3(
+        playerPosRef.current.x,
+        playerPosRef.current.y + 1.0,
+        playerPosRef.current.z
+      );
+      const dirVec = new THREE.Vector3().subVectors(targetVec, new THREE.Vector3(...startPos)).normalize();
+
+      const aiArrow: PlasmaArrowData = {
+        id: Date.now() + Math.random(),
+        start: startPos,
+        dir: [dirVec.x, dirVec.y, dirVec.z],
+        speed: 24,
+        color: '#ef4444',
+        damage: 15,
+        isFromEnemy: true,
+      };
+
+      setArrows((prev) => [...prev.slice(-8), aiArrow]);
+      return;
+    }
+
+    // Melee Mode: Close-range physical attack
     playSound('pulse');
 
     setTimeout(() => {
@@ -930,13 +1132,64 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     }, 200);
   };
 
-  // Handle Plasma Arrow Impact on Enemy or Expiration
-  const handleArrowImpact = (arrowId: number, hitPos?: [number, number, number]) => {
+  // Handle Plasma Arrow Impact on Enemy or Player or Expiration
+  const handleArrowImpact = (arrowId: number, hitPos?: [number, number, number], isFromEnemy?: boolean) => {
     // Remove arrow from flight
     setArrows((prev) => prev.filter((a) => a.id !== arrowId));
 
     if (!hitPos || isVictory || isDefeat) return;
 
+    if (isFromEnemy) {
+      // Enemy Arrow impacts Player!
+      if (isPlayerDodging) {
+        playSound('scan');
+        setLastDamageEvent({ text: 'AI ARROW DODGED!', isCrit: false, id: Date.now() });
+        return;
+      }
+
+      const [hitX, hitY, hitZ] = hitPos;
+      setHitSparks((prev) => [
+        ...prev.slice(-6),
+        { id: Date.now(), pos: [hitX, hitY, hitZ], color: '#ef4444' },
+        { id: Date.now() + 1, pos: [hitX + 0.15, hitY + 0.1, hitZ - 0.15], color: '#fbbf24' },
+      ]);
+
+      if (isPlayerBlocking) {
+        const dmg = 4;
+        setPlayerHp((hp) => {
+          const nextHp = Math.max(0, hp - dmg);
+          telemetryCollectorRef.current.recordDamageReceived({
+            damage: dmg,
+            wasBlocked: true,
+            playerHp: nextHp,
+            enemyHp,
+          });
+          return nextHp;
+        });
+        playSound('scan');
+        setLastDamageEvent({ text: `ENERGY SHIELD BLOCKED ARROW! -${dmg} HP`, isCrit: false, id: Date.now() });
+      } else {
+        const dmg = 14;
+        setPlayerHp((hp) => {
+          const nextHp = Math.max(0, hp - dmg);
+          telemetryCollectorRef.current.recordDamageReceived({
+            damage: dmg,
+            wasBlocked: false,
+            playerHp: nextHp,
+            enemyHp,
+          });
+          return nextHp;
+        });
+        setIsPlayerHit(true);
+        playSound('arrow_hit');
+        playSound('denied');
+        setLastDamageEvent({ text: `CRIMSON ARROW STRIKE! -${dmg} HP`, isCrit: true, id: Date.now() });
+        setTimeout(() => setIsPlayerHit(false), 200);
+      }
+      return;
+    }
+
+    // Player arrow impacts Enemy
     playSound('arrow_hit');
     playSound('granted');
 
@@ -1454,7 +1707,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         position: 'relative',
         width: '100vw',
         height: '100vh',
-        background: 'linear-gradient(180deg, #60a5fa 0%, #bfdbfe 100%)',
+        background: isArchery
+          ? 'linear-gradient(180deg, #021a11 0%, #062c1d 60%, #02140d 100%)'
+          : 'linear-gradient(180deg, #60a5fa 0%, #bfdbfe 100%)',
         overflow: 'hidden',
         userSelect: 'none',
       }}
@@ -1521,7 +1776,26 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
       >
         {/* Sky & Atmosphere — switches by stage theme */}
-        {stageTheme === 'space' ? (
+        {effectiveStageTheme === 'jungle' ? (
+          <>
+            <color attach="background" args={['#031d13']} />
+            <fog attach="fog" args={['#062319', 25, 110]} />
+            <ambientLight intensity={0.75} color="#10b981" />
+            <hemisphereLight groundColor="#064e3b" color="#6ee7b7" intensity={0.6} />
+            {/* Canopy filtered sunbeam */}
+            <directionalLight
+              position={[25, 45, 20]}
+              intensity={2.4}
+              color="#fef08a"
+              castShadow
+              shadow-mapSize-width={2048}
+              shadow-mapSize-height={2048}
+            />
+            <directionalLight position={[-20, 30, -15]} intensity={0.7} color="#34d399" />
+            {/* Ancient emerald shrine glow */}
+            <pointLight position={[0, 4, 0]} intensity={2.2} color="#10b981" distance={24} />
+          </>
+        ) : effectiveStageTheme === 'space' ? (
           <>
             <color attach="background" args={['#020408']} />
             <fog attach="fog" args={['#020408', 60, 220]} />
@@ -1546,11 +1820,11 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         {/* Dodge Lock Manager Game Loop Tick */}
         <ArenaGameLoop onUpdate={(delta) => dodgeLockManagerRef.current.update(delta)} />
 
-        {/* Floating Sunlit Atmospheric Dust */}
-        <SunParticles3D />
+        {/* Floating Atmospheric Particles */}
+        {effectiveStageTheme === 'jungle' ? <JungleSporeParticles3D /> : <SunParticles3D />}
 
         {/* Arena Stage */}
-        <PlayableArenaStage />
+        <PlayableArenaStage theme={effectiveStageTheme} />
 
         {/* Dynamic Hit Sparks */}
         {hitSparks.map((spark) => (
@@ -1569,6 +1843,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
             arrow={arrow}
             onImpact={handleArrowImpact}
             enemyPosRef={enemyPosRef}
+            playerPosRef={playerPosRef}
           />
         ))}
 
@@ -1611,6 +1886,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           isPlayerDodging={isPlayerDodging}
           playerComboCount={comboCount}
           isChallengeActive={dodgeLockEvent.state === 'CHALLENGE_ACTIVE'}
+          selectedStyle={selectedStyle}
         />
       </Canvas>
     </div>

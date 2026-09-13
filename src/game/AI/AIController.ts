@@ -108,7 +108,7 @@ export class AIController {
           : new THREE.Vector3().subVectors(playerPos, enemyPos).setY(0);
 
         const currentDist = enemyPos.distanceTo(playerPos);
-        const MIN_COMBAT_DISTANCE = 1.85; // Maintain combat spacing — don't walk inside player!
+        const MIN_COMBAT_DISTANCE = fullCtx.combatStyle === 'archery' ? 4.2 : 1.85; // Maintain sniper range in archery mode
 
         if (currentDist > MIN_COMBAT_DISTANCE && dir.length() > 0.05) {
           dir.normalize();
@@ -117,8 +117,8 @@ export class AIController {
             : this.approachSpeed;
           enemyPos.x += dir.x * effectiveSpeed * delta;
           enemyPos.z += dir.z * effectiveSpeed * delta;
-        } else if (currentDist < 1.45) {
-          // Push away slightly to prevent model clipping
+        } else if (currentDist < (fullCtx.combatStyle === 'archery' ? 3.0 : 1.45)) {
+          // Push away slightly to maintain spacing and prevent clipping
           const pushAway = new THREE.Vector3().subVectors(enemyPos, playerPos).setY(0);
           if (pushAway.length() > 0.01) {
             pushAway.normalize();

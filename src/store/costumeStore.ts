@@ -12,7 +12,7 @@ export type FoxCostume =
   | 'green'     // 🟢 Corneria Recon
   | 'dark';     // ⚫ Shadow Matrix
 
-export type StageTheme = 'colosseum' | 'space';
+export type StageTheme = 'colosseum' | 'space' | 'jungle';
 
 export interface CostumeInfo {
   id: FoxCostume;

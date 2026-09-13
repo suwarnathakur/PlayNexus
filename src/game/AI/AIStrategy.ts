@@ -13,7 +13,8 @@ export class AIStrategy {
    */
   public static decideNextState(ctx: AICombatContext, _currentState?: AIStateType): AIStateType {
     const isLowHealth = ctx.enemyHp <= AI_RETREAT_HP_THRESHOLD;
-    const isWithinRange = ctx.distanceToPlayer <= AI_ATTACK_RANGE;
+    const effectiveAttackRange = ctx.combatStyle === 'archery' ? 8.5 : AI_ATTACK_RANGE;
+    const isWithinRange = ctx.distanceToPlayer <= effectiveAttackRange;
     const roll = Math.random(); // 0.0 to 1.0 for randomized organic behavior
 
     // Scenario A: Low Health Defense Priority

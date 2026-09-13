@@ -21,4 +21,5 @@ export interface AICombatContext {
   isPlayerAttacking: boolean;
   isPlayerBlocking: boolean;
   arenaRadius: number;
+  combatStyle?: 'melee' | 'archery';
 }
