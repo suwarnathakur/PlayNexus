@@ -234,40 +234,6 @@ const CinematicCamera: React.FC<{ mouseX: number; mouseY: number }> = ({ mouseX,
   return null;
 };
 
-const CyberParticles3D: React.FC = () => {
-  const particles = React.useMemo(() => {
-    const items: Array<[number, number, number]> = [];
-
-    for (let i = 0; i < 120; i++) {
-      const radius = 12 + Math.random() * 18;
-      const angle = (i / 120) * Math.PI * 2;
-      const y = 1 + Math.random() * 7;
-      items.push([
-        Math.cos(angle) * radius,
-        y,
-        Math.sin(angle) * radius,
-      ]);
-    }
-
-    return items;
-  }, []);
-
-  return (
-    <group>
-      {particles.map((position, index) => (
-        <mesh key={index} position={position}>
-          <sphereGeometry args={[0.06, 10, 10]} />
-          <meshStandardMaterial
-            color={index % 2 === 0 ? '#00f0ff' : '#9d4edd'}
-            emissive={index % 2 === 0 ? '#00f0ff' : '#9d4edd'}
-            emissiveIntensity={0.9}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-};
-
 const ShadowMapFix: React.FC = () => {
   const { gl } = useThree();
 

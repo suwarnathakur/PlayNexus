@@ -59,7 +59,6 @@ export const DEMO_MATCH_1_TELEMETRY: MatchTelemetry = {
     dodgeLeftCount: 15,
     dodgeRightCount: 3,
     dodgeOtherCount: 0,
-<<<<<<< HEAD
     dodgeLeftPercentage: 83.3,
     dodgeRightPercentage: 16.7,
     dodgeOtherPercentage: 0,

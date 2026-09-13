@@ -1172,8 +1172,6 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       return;
     }
 
-    // Sword Mode: Close-range blade slash with heavier damage and a distinct slash feel.
-    const swordAttackDamage = 18;
     playSound(selectedStyle === 'sword' ? 'pulse' : 'pulse');
 
     setTimeout(() => {
