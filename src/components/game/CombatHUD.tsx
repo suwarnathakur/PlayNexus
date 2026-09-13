@@ -51,6 +51,7 @@ interface CombatHUDProps {
   onBlockPress?: () => void;
   onDodgePress?: () => void;
   onSpecialPress?: () => void;
+  selectedStyle?: 'melee' | 'archery';
 }
 
 export const CombatHUD: React.FC<CombatHUDProps> = ({
@@ -77,7 +78,9 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
   onBlockPress,
   onDodgePress,
   onSpecialPress,
+  selectedStyle = 'melee',
 }) => {
+  const isArchery = selectedStyle === 'archery';
   return (
     <div
       style={{
@@ -422,7 +425,7 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
               <span style={{ background: '#00f0ff', color: '#000', padding: '1px 5px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
                 J
               </span>
-              <span>ATTACK</span>
+              <span>{isArchery ? 'PLASMA ARROW' : 'ATTACK'}</span>
             </button>
 
             {/* Block Button / Indicator */}
@@ -449,7 +452,7 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
               <span style={{ background: '#9d4edd', color: '#000', padding: '1px 5px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
                 K
               </span>
-              <span>BLOCK</span>
+              <span>{isArchery ? 'ENERGY SHIELD' : 'BLOCK'}</span>
             </button>
 
             {/* Dodge Button / Indicator */}
@@ -476,7 +479,7 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
               <span style={{ background: '#00ff9d', color: '#000', padding: '1px 5px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
                 SPACE
               </span>
-              <span>DODGE</span>
+              <span>{isArchery ? 'EVASIVE ROLL' : 'DODGE'}</span>
             </button>
 
             {/* Special Ability Button / Indicator */}
@@ -503,7 +506,7 @@ export const CombatHUD: React.FC<CombatHUDProps> = ({
               <span style={{ background: '#ffaa00', color: '#000', padding: '1px 5px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
                 U
               </span>
-              <span>SPECIAL</span>
+              <span>{isArchery ? 'PLASMA VOLLEY' : 'SPECIAL'}</span>
             </button>
 
             {/* Voice Input Prompt */}

@@ -16,7 +16,10 @@ export type SoundType =
   | 'victory'
   | 'defeat'
   | 'shine'   // Fox Melee Reflector — iconic metallic Ting!
-  | 'laser';  // Arwing blaster chirp
+  | 'laser'   // Arwing blaster chirp
+  | 'arrow_shot' // Plasma Bow twang and high-speed energy release
+  | 'arrow_hit'  // Plasma arrow impact discharge
+  | 'bow_charge'; // Bowstring plasma charge build-up
 
 // Global audio state shared across components, persisted in localStorage
 let globalAudioMuted = false;
@@ -357,6 +360,78 @@ export const useSound = () => {
           osc2.connect(g2); g2.connect(ctx.destination);
           osc1.start(now); osc1.stop(now + 0.11);
           osc2.start(now); osc2.stop(now + 0.04);
+          break;
+        }
+
+        case 'arrow_shot': {
+          // Cyber Plasma Bow release: metallic string twang + whistling plasma bolt
+          const oscTwang = ctx.createOscillator();
+          const oscWhistle = ctx.createOscillator();
+          const gTwang = ctx.createGain();
+          const gWhistle = ctx.createGain();
+
+          // String twang: rapid dropping harmonic (520Hz down to 140Hz)
+          oscTwang.type = 'sawtooth';
+          oscTwang.frequency.setValueAtTime(540, now);
+          oscTwang.frequency.exponentialRampToValueAtTime(140, now + 0.08);
+          gTwang.gain.setValueAtTime(0.18, now);
+          gTwang.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+          // Plasma bolt whistle / whoosh: high sine zip
+          oscWhistle.type = 'sine';
+          oscWhistle.frequency.setValueAtTime(1400, now);
+          oscWhistle.frequency.exponentialRampToValueAtTime(2800, now + 0.03);
+          oscWhistle.frequency.exponentialRampToValueAtTime(800, now + 0.12);
+          gWhistle.gain.setValueAtTime(0.12, now);
+          gWhistle.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+          oscTwang.connect(gTwang); gTwang.connect(ctx.destination);
+          oscWhistle.connect(gWhistle); gWhistle.connect(ctx.destination);
+          oscTwang.start(now); oscTwang.stop(now + 0.08);
+          oscWhistle.start(now); oscWhistle.stop(now + 0.12);
+          break;
+        }
+
+        case 'arrow_hit': {
+          // Plasma Arrow target penetration & energy discharge
+          const oscCrack = ctx.createOscillator();
+          const oscBoom = ctx.createOscillator();
+          const gCrack = ctx.createGain();
+          const gBoom = ctx.createGain();
+
+          oscCrack.type = 'triangle';
+          oscCrack.frequency.setValueAtTime(800, now);
+          oscCrack.frequency.exponentialRampToValueAtTime(90, now + 0.09);
+          gCrack.gain.setValueAtTime(0.25, now);
+          gCrack.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+          oscBoom.type = 'sine';
+          oscBoom.frequency.setValueAtTime(220, now);
+          oscBoom.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+          gBoom.gain.setValueAtTime(0.2, now);
+          gBoom.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+          oscCrack.connect(gCrack); gCrack.connect(ctx.destination);
+          oscBoom.connect(gBoom); gBoom.connect(ctx.destination);
+          oscCrack.start(now); oscCrack.stop(now + 0.09);
+          oscBoom.start(now); oscBoom.stop(now + 0.18);
+          break;
+        }
+
+        case 'bow_charge': {
+          // Tension rising charge before release or plasma volley
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(1200, now + 0.22);
+          g.gain.setValueAtTime(0.02, now);
+          g.gain.linearRampToValueAtTime(0.15, now + 0.18);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+          osc.connect(g); g.connect(ctx.destination);
+          osc.start(now); osc.stop(now + 0.24);
           break;
         }
       }

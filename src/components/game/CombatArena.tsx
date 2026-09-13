@@ -22,9 +22,10 @@ import { DodgeLockOverlay } from './DodgeLockOverlay';
 import { useVoiceCommands } from '../../hooks/useVoiceCommands';
 import { useDemoStore } from '../../demo/demoStore';
 import { DEMO_COUNTER_STRATEGY } from '../../demo/demoData';
-import { useCostumeStore } from '../../store/costumeStore';
+import { useCostumeStore, type CombatStyle } from '../../store/costumeStore';
 
 import { FoxCharacter3D } from '../3d/FoxCharacter3D';
+import { ArcherCharacter3D } from '../3d/ArcherCharacter3D';
 
 const ARENA_RADIUS = 6.2;
 const MOVEMENT_SPEED = 5.2;
@@ -109,7 +110,129 @@ const LaserBolt: React.FC<LaserBoltProps> = ({ from, to, color = '#ff4444' }) =>
 };
 
 /**
- * 3D Player Fighter Component (Fox McCloud)
+ * High-Velocity Plasma Arrow Projectile Entity
+ */
+export interface PlasmaArrowData {
+  id: number;
+  start: [number, number, number];
+  dir: [number, number, number];
+  speed: number;
+  color: string;
+  damage: number;
+  isSpecial?: boolean;
+}
+
+const PlasmaArrowMesh: React.FC<{
+  arrow: PlasmaArrowData;
+  onImpact: (arrowId: number, hitPos?: [number, number, number]) => void;
+  enemyPosRef: React.MutableRefObject<THREE.Vector3>;
+}> = ({ arrow, onImpact, enemyPosRef }) => {
+  const meshRef = useRef<THREE.Group>(null);
+  const curPos = useRef(new THREE.Vector3(...arrow.start));
+  const dirVec = useMemo(() => new THREE.Vector3(...arrow.dir).normalize(), [arrow.dir]);
+  const life = useRef(0);
+  const maxLife = 1.4;
+  const hasImpacted = useRef(false);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current || hasImpacted.current) return;
+    life.current += delta;
+    if (life.current > maxLife) {
+      hasImpacted.current = true;
+      onImpact(arrow.id);
+      return;
+    }
+
+    curPos.current.addScaledVector(dirVec, arrow.speed * delta);
+    meshRef.current.position.copy(curPos.current);
+
+    // Collision check against enemy target hitbox
+    const distToEnemy = curPos.current.distanceTo(
+      new THREE.Vector3(enemyPosRef.current.x, enemyPosRef.current.y + 0.8, enemyPosRef.current.z)
+    );
+    if (distToEnemy < 1.3) {
+      hasImpacted.current = true;
+      onImpact(arrow.id, [curPos.current.x, curPos.current.y, curPos.current.z]);
+    }
+  });
+
+  const quaternion = useMemo(() => {
+    const q = new THREE.Quaternion();
+    q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dirVec);
+    return q;
+  }, [dirVec]);
+
+  return (
+    <group ref={meshRef} position={arrow.start} quaternion={quaternion}>
+      {/* High-energy plasma beam shaft */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.022, 0.022, 1.1, 8]} />
+        <meshBasicMaterial color={arrow.color} transparent opacity={0.95} />
+      </mesh>
+      {/* Arrow Broadhead Emitter */}
+      <mesh position={[0, 0, 0.55]} rotation={[Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.07, 0.22, 8]} />
+        <meshBasicMaterial color="#ffffff" />
+      </mesh>
+      {/* Trailing Particle Core */}
+      <mesh position={[0, 0, -0.2]}>
+        <sphereGeometry args={[0.08, 8, 8]} />
+        <meshBasicMaterial color={arrow.color} transparent opacity={0.5} />
+      </mesh>
+    </group>
+  );
+};
+
+/**
+ * Holographic Archery Crosshair Lock on Enemy
+ */
+const SniperCrosshair: React.FC<{ targetPos: React.MutableRefObject<THREE.Vector3> }> = ({ targetPos }) => {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame((state, delta) => {
+    if (groupRef.current) {
+      groupRef.current.position.set(targetPos.current.x, targetPos.current.y + 1.1, targetPos.current.z);
+      groupRef.current.rotation.z += delta * 2.2;
+      const t = state.clock.getElapsedTime();
+      const pulse = 1.0 + Math.sin(t * 8) * 0.08;
+      groupRef.current.scale.set(pulse, pulse, pulse);
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh>
+        <ringGeometry args={[0.42, 0.48, 24]} />
+        <meshBasicMaterial color="#c084fc" transparent opacity={0.75} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Reticle ticks */}
+      <mesh position={[0, 0.52, 0]}>
+        <boxGeometry args={[0.03, 0.12, 0.01]} />
+        <meshBasicMaterial color="#c084fc" />
+      </mesh>
+      <mesh position={[0, -0.52, 0]}>
+        <boxGeometry args={[0.03, 0.12, 0.01]} />
+        <meshBasicMaterial color="#c084fc" />
+      </mesh>
+      <mesh position={[-0.52, 0, 0]}>
+        <boxGeometry args={[0.12, 0.03, 0.01]} />
+        <meshBasicMaterial color="#c084fc" />
+      </mesh>
+      <mesh position={[0.52, 0, 0]}>
+        <boxGeometry args={[0.12, 0.03, 0.01]} />
+        <meshBasicMaterial color="#c084fc" />
+      </mesh>
+      {/* Center lock pip */}
+      <mesh>
+        <circleGeometry args={[0.04, 12]} />
+        <meshBasicMaterial color="#00f0ff" />
+      </mesh>
+    </group>
+  );
+};
+
+/**
+ * 3D Player Fighter Component (Fox McCloud or Archer)
  */
 interface PlayerFighterProps {
   position: React.MutableRefObject<THREE.Vector3>;
@@ -120,6 +243,7 @@ interface PlayerFighterProps {
   isDodging: boolean;
   isHit: boolean;
   costume?: import('../../store/costumeStore').FoxCostume;
+  selectedStyle?: CombatStyle;
   onPositionUpdate: (pos: [number, number, number], isMoving: boolean) => void;
 }
 
@@ -132,6 +256,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
   isDodging,
   isHit,
   costume,
+  selectedStyle = 'melee',
   onPositionUpdate,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
@@ -218,16 +343,27 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
 
   return (
     <group ref={groupRef} position={[-2.2, 0.2, 0]}>
-      <FoxCharacter3D
-        variant="fox"
-        costume={costume}
-        isAttacking={isAttacking}
-        isBlocking={isBlocking}
-        isDodging={isDodging}
-        isHit={isHit}
-        isDead={isDead}
-        isMoving={isMoving}
-      />
+      {selectedStyle === 'archery' ? (
+        <ArcherCharacter3D
+          isAttacking={isAttacking}
+          isBlocking={isBlocking}
+          isDodging={isDodging}
+          isHit={isHit}
+          isDead={isDead}
+          isMoving={isMoving}
+        />
+      ) : (
+        <FoxCharacter3D
+          variant="fox"
+          costume={costume}
+          isAttacking={isAttacking}
+          isBlocking={isBlocking}
+          isDodging={isDodging}
+          isHit={isHit}
+          isDead={isDead}
+          isMoving={isMoving}
+        />
+      )}
     </group>
   );
 };
@@ -561,6 +697,8 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const [hitSparks, setHitSparks] = useState<{ id: number; pos: [number, number, number]; color: string }[]>([]);
   // Arwing Laser Bolts on Special
   const [laserBolts, setLaserBolts] = useState<{ id: number; from: [number, number, number]; to: [number, number, number]; color: string }[]>([]);
+  // Archery Plasma Arrows
+  const [arrows, setArrows] = useState<PlasmaArrowData[]>([]);
 
   // End of match
   const isVictory = enemyHp <= 0;
@@ -588,8 +726,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     }
   }, []);
 
-  // Costume & Stage Theme
-  const { selectedCostume, stageTheme } = useCostumeStore();
+  // Costume, Stage Theme & Combat Style
+  const { selectedCostume, stageTheme, selectedStyle } = useCostumeStore();
+  const isArchery = selectedStyle === 'archery';
 
   // Demo Mode Store State
   const {
@@ -791,14 +930,137 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     }, 200);
   };
 
+  // Handle Plasma Arrow Impact on Enemy or Expiration
+  const handleArrowImpact = (arrowId: number, hitPos?: [number, number, number]) => {
+    // Remove arrow from flight
+    setArrows((prev) => prev.filter((a) => a.id !== arrowId));
+
+    if (!hitPos || isVictory || isDefeat) return;
+
+    playSound('arrow_hit');
+    playSound('granted');
+
+    const [hitX, hitY, hitZ] = hitPos;
+    setHitSparks((prev) => [
+      ...prev.slice(-6),
+      { id: Date.now(), pos: [hitX, hitY, hitZ], color: '#c084fc' },
+      { id: Date.now() + 1, pos: [hitX - 0.15, hitY + 0.2, hitZ + 0.15], color: '#00f0ff' },
+    ]);
+
+    const isEnemyCurrentlyBlocking = aiControllerRef.current.isBlocking();
+    if (isEnemyCurrentlyBlocking) {
+      const dmg = 6;
+      const nextEnemyHp = Math.max(0, enemyHp - dmg);
+      setEnemyHp(nextEnemyHp);
+      playSound('scan');
+      setLastDamageEvent({ text: `AI DEFLECTED ARROW! -${dmg} HP`, isCrit: false, id: Date.now() });
+
+      telemetryCollectorRef.current.recordHit({
+        damage: dmg,
+        combo: 1,
+        playerHp,
+        enemyHp: nextEnemyHp,
+      });
+      telemetryCollectorRef.current.recordDamageDealt({
+        damage: dmg,
+        playerHp,
+        enemyHp: nextEnemyHp,
+      });
+    } else {
+      const newCombo = comboCount + 1;
+      setComboCount(newCombo);
+
+      const isCrit = newCombo >= 3;
+      const baseDmg = isCrit ? 28 : 18;
+      const weaponMultiplier = equippedWeapon?.powerBonusPercent
+        ? 1 + equippedWeapon.powerBonusPercent / 100
+        : 1.0;
+      const dmg = Math.round(baseDmg * weaponMultiplier);
+      const nextEnemyHp = Math.max(0, enemyHp - dmg);
+
+      setEnemyHp(nextEnemyHp);
+      setIsEnemyHit(true);
+
+      const weaponTag = equippedWeapon ? ` [${equippedWeapon.weapon.toUpperCase()}]` : '';
+      setLastDamageEvent({
+        text: isCrit ? `CRITICAL ARROW!${weaponTag} -${dmg} HP` : `ARROW HIT!${weaponTag} -${dmg} HP`,
+        isCrit,
+        id: Date.now(),
+      });
+
+      telemetryCollectorRef.current.recordHit({
+        damage: dmg,
+        combo: newCombo,
+        playerHp,
+        enemyHp: nextEnemyHp,
+      });
+      telemetryCollectorRef.current.recordDamageDealt({
+        damage: dmg,
+        playerHp,
+        enemyHp: nextEnemyHp,
+      });
+
+      setTimeout(() => setIsEnemyHit(false), 200);
+
+      if (comboResetTimer.current) clearTimeout(comboResetTimer.current);
+      comboResetTimer.current = setTimeout(() => {
+        setComboCount(0);
+      }, 2000);
+    }
+  };
+
   // Trigger Player Attack
   const triggerPlayerAttack = () => {
     if (isPlayerAttacking || isPlayerDodging || isVictory || isDefeat) return;
 
+    const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
+
+    // Archery: Fire Plasma Arrow Projectile
+    if (isArchery) {
+      setIsPlayerAttacking(true);
+      playSound('arrow_shot');
+
+      const startPos: [number, number, number] = [
+        playerPosRef.current.x,
+        playerPosRef.current.y + 1.1,
+        playerPosRef.current.z,
+      ];
+      const targetVec = new THREE.Vector3(
+        enemyPosRef.current.x,
+        enemyPosRef.current.y + 1.0,
+        enemyPosRef.current.z
+      );
+      const dirVec = new THREE.Vector3()
+        .subVectors(targetVec, new THREE.Vector3(...startPos))
+        .normalize();
+
+      const newArrow: PlasmaArrowData = {
+        id: Date.now() + Math.random(),
+        start: startPos,
+        dir: [dirVec.x, dirVec.y, dirVec.z],
+        speed: 26,
+        color: '#c084fc',
+        damage: 18,
+      };
+
+      setArrows((prev) => [...prev.slice(-8), newArrow]);
+
+      telemetryCollectorRef.current.recordAttack({
+        combo: comboCount + 1,
+        distanceToEnemy: dist,
+        playerHp,
+        enemyHp,
+      });
+
+      setTimeout(() => {
+        setIsPlayerAttacking(false);
+      }, 280);
+      return;
+    }
+
+    // Melee / Fox McCloud: Close-Range Strike
     setIsPlayerAttacking(true);
     playSound('pulse');
-
-    const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
 
     // Record attack input telemetry
     telemetryCollectorRef.current.recordAttack({
@@ -894,7 +1156,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const triggerPlayerBlockStart = () => {
     if (isVictory || isDefeat) return;
     setIsPlayerBlocking(true);
-    playSound('shine'); // Iconic Fox Melee Reflector Shine chime
+    playSound(isArchery ? 'scan' : 'shine'); // Archery Energy Buckler or Fox Melee Reflector Shine chime
     telemetryCollectorRef.current.recordBlock({
       playerHp,
       enemyHp,
@@ -970,6 +1232,61 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   const triggerPlayerSpecial = () => {
     if (isPlayerAttacking || isPlayerDodging || isVictory || isDefeat) return;
 
+    const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
+
+    // Archery Special: Triple Spread Plasma Volley
+    if (isArchery) {
+      setIsPlayerAttacking(true);
+      playSound('bow_charge');
+      setTimeout(() => {
+        playSound('arrow_shot');
+      }, 90);
+
+      const startPos: [number, number, number] = [
+        playerPosRef.current.x,
+        playerPosRef.current.y + 1.1,
+        playerPosRef.current.z,
+      ];
+      const targetVec = new THREE.Vector3(
+        enemyPosRef.current.x,
+        enemyPosRef.current.y + 1.0,
+        enemyPosRef.current.z
+      );
+      const baseDir = new THREE.Vector3()
+        .subVectors(targetVec, new THREE.Vector3(...startPos))
+        .normalize();
+
+      // Triple spread arrows (center, -14 deg, +14 deg)
+      const angles = [0, -0.22, 0.22];
+      const volleyArrows: PlasmaArrowData[] = angles.map((ang, i) => {
+        const dir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), ang);
+        return {
+          id: Date.now() + i,
+          start: startPos,
+          dir: [dir.x, dir.y, dir.z],
+          speed: 30,
+          color: i === 0 ? '#38bdf8' : '#c084fc',
+          damage: 26,
+          isSpecial: true,
+        };
+      });
+
+      setArrows((prev) => [...prev.slice(-8), ...volleyArrows]);
+
+      telemetryCollectorRef.current.recordAttack({
+        combo: comboCount + 1,
+        distanceToEnemy: dist,
+        playerHp,
+        enemyHp,
+      });
+
+      setTimeout(() => {
+        setIsPlayerAttacking(false);
+      }, 380);
+      return;
+    }
+
+    // Fox McCloud Melee: Arwing Blaster Laser
     setIsPlayerAttacking(true);
     playSound('laser'); // Arwing Blaster chirp
     playSound('granted');
@@ -987,8 +1304,6 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     const boltId = Date.now();
     setLaserBolts((prev) => [...prev.slice(-5), { id: boltId, from, to, color: '#ff3333' }]);
     setTimeout(() => setLaserBolts((prev) => prev.filter((b) => b.id !== boltId)), 600);
-
-    const dist = playerPosRef.current.distanceTo(enemyPosRef.current);
 
     // Multi-color elemental explosion sparks
     const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
@@ -1157,6 +1472,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         voiceError={voiceCommands.error}
         onToggleVoice={voiceCommands.toggleListening}
         onSpecialPress={triggerPlayerSpecial}
+        selectedStyle={selectedStyle}
         enemyHp={enemyHp}
         enemyMaxHp={ENEMY_MAX_HP}
         enemyState={isVictory ? 'DEFEATED' : aiCurrentState}
@@ -1246,6 +1562,21 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           <LaserBolt key={bolt.id} from={bolt.from} to={bolt.to} color={bolt.color} />
         ))}
 
+        {/* Cyber Plasma Arrows */}
+        {arrows.map((arrow) => (
+          <PlasmaArrowMesh
+            key={arrow.id}
+            arrow={arrow}
+            onImpact={handleArrowImpact}
+            enemyPosRef={enemyPosRef}
+          />
+        ))}
+
+        {/* Archery Holographic Sniper Crosshair */}
+        {isArchery && !isVictory && !isDefeat && (
+          <SniperCrosshair targetPos={enemyPosRef} />
+        )}
+
         {/* Camera Follow — frames both fighters dynamically */}
         <FollowCamera
           playerPosition={playerCoordinates}
@@ -1262,6 +1593,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           isDodging={isPlayerDodging}
           isHit={isPlayerHit}
           costume={selectedCostume}
+          selectedStyle={selectedStyle}
           onPositionUpdate={(pos, isMoving) => handlePlayerPositionUpdate(pos, isMoving)}
         />
 

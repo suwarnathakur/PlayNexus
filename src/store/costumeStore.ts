@@ -72,11 +72,15 @@ export const FOX_COSTUMES: CostumeInfo[] = [
   },
 ];
 
+export type CombatStyle = 'melee' | 'archery';
+
 interface CostumeState {
   selectedCostume: FoxCostume;
   stageTheme: StageTheme;
+  selectedStyle: CombatStyle;
   setCostume: (c: FoxCostume) => void;
   setStageTheme: (s: StageTheme) => void;
+  setStyle: (s: CombatStyle) => void;
 }
 
 const load = <T>(key: string, fallback: T): T => {
@@ -95,6 +99,7 @@ const save = (key: string, value: unknown) => {
 export const useCostumeStore = create<CostumeState>((set) => ({
   selectedCostume: load<FoxCostume>('playnexus_costume', 'classic'),
   stageTheme: load<StageTheme>('playnexus_stage', 'colosseum'),
+  selectedStyle: load<CombatStyle>('playnexus_selected_style', 'melee'),
 
   setCostume: (c) => {
     save('playnexus_costume', c);
@@ -103,5 +108,9 @@ export const useCostumeStore = create<CostumeState>((set) => ({
   setStageTheme: (s) => {
     save('playnexus_stage', s);
     set({ stageTheme: s });
+  },
+  setStyle: (s) => {
+    save('playnexus_selected_style', s);
+    set({ selectedStyle: s });
   },
 }));

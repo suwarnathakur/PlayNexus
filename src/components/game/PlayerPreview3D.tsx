@@ -2,19 +2,22 @@ import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FoxCharacter3D } from '../3d/FoxCharacter3D';
+import { ArcherCharacter3D } from '../3d/ArcherCharacter3D';
 
 interface PlayerPreviewModelProps {
   glowColor?: string;
   isMelee?: boolean;
+  selectedStyle?: 'melee' | 'archery';
 }
 
-const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = () => {
+const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = ({ isMelee = true, selectedStyle }) => {
   const groupRef = useRef<THREE.Group>(null);
+  const isArcher = selectedStyle === 'archery' || !isMelee;
 
   useFrame((state) => {
     if (groupRef.current) {
       const t = state.clock.getElapsedTime();
-      // Gentle floating and smooth rotation showcasing Fox McCloud from all angles
+      // Gentle floating and smooth rotation showcasing character from all angles
       groupRef.current.position.y = 0.12 + Math.sin(t * 2.4) * 0.03;
       groupRef.current.rotation.y = Math.sin(t * 0.6) * 0.45;
     }
@@ -22,7 +25,11 @@ const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = () => {
 
   return (
     <group ref={groupRef} position={[0, 0.12, 0]}>
-      <FoxCharacter3D variant="fox" />
+      {isArcher ? (
+        <ArcherCharacter3D />
+      ) : (
+        <FoxCharacter3D variant="fox" />
+      )}
     </group>
   );
 };
@@ -65,11 +72,13 @@ const PedestalStage: React.FC<{ glowColor: string }> = ({ glowColor }) => {
 interface PlayerPreview3DProps {
   glowColor?: string;
   isMelee?: boolean;
+  selectedStyle?: 'melee' | 'archery';
 }
 
 export const PlayerPreview3D: React.FC<PlayerPreview3DProps> = ({
   glowColor = '#00f0ff',
   isMelee = true,
+  selectedStyle,
 }) => {
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '340px', position: 'relative' }}>
@@ -84,7 +93,7 @@ export const PlayerPreview3D: React.FC<PlayerPreview3DProps> = ({
         <pointLight position={[2.5, 2, -1]} intensity={1.5} color="#9d4edd" distance={6} />
 
         <PedestalStage glowColor={glowColor} />
-        <PlayerPreviewModel glowColor={glowColor} isMelee={isMelee} />
+        <PlayerPreviewModel glowColor={glowColor} isMelee={isMelee} selectedStyle={selectedStyle} />
       </Canvas>
 
       {/* Hologram Scan Watermark Overlay */}

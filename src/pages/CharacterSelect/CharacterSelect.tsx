@@ -5,6 +5,7 @@ import { PlayerPreview3D } from '../../components/game/PlayerPreview3D';
 import { GlowButton } from '../../components/common/GlowButton';
 import { Scanline } from '../../components/effects/Scanline';
 import { useSound } from '../../hooks/useSound';
+import { useCostumeStore } from '../../store/costumeStore';
 import {
   Swords,
   Lock,
@@ -64,18 +65,18 @@ const FIGHTING_STYLES: FightingStyle[] = [
     name: 'ARCHERY',
     archetype: 'PLASMA SNIPER',
     difficulty: 4,
-    difficultyLabel: 'HARD ★★★★☆',
-    isPlayable: false,
+    difficultyLabel: 'TACTICAL PRECISION ★★★★☆',
+    isPlayable: true,
     accentColor: '#9d4edd',
     icon: <Crosshair size={22} />,
-    tagline: 'Long-range laser tracking and projectile zoning',
+    tagline: 'Precision long-range plasma arrows, energy buckler, and zoning',
     description:
-      'Tactical precision archetype. Attacks from distance with charged plasma arrows. Locked for Sector 02 tournament clearance.',
+      'High-tech tactical ranger equipped with the Vortex Cyber Plasma Bow, energy quiver, and cybernetic sniper visor. Features high-velocity primary arrows, multi-arrow plasma volleys, and agile combat evasions.',
     stats: {
       power: 92,
-      speed: 70,
-      defense: 60,
-      adaptability: 82,
+      speed: 86,
+      defense: 74,
+      adaptability: 92,
     },
   },
   {
@@ -159,7 +160,9 @@ const FIGHTING_STYLES: FightingStyle[] = [
 export const CharacterSelect: React.FC = () => {
   const navigate = useNavigate();
   const { playSound } = useSound();
-  const [selectedStyleId, setSelectedStyleId] = useState<string>('melee');
+  const storedStyle = useCostumeStore((s) => s.selectedStyle);
+  const setStoreStyle = useCostumeStore((s) => s.setStyle);
+  const [selectedStyleId, setSelectedStyleId] = useState<string>(storedStyle || 'melee');
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
 
   const selectedStyle =
@@ -169,12 +172,15 @@ export const CharacterSelect: React.FC = () => {
     if (style.isPlayable) {
       playSound('click');
       setSelectedStyleId(style.id);
+      if (style.id === 'melee' || style.id === 'archery') {
+        setStoreStyle(style.id);
+      }
       setLockedNotice(null);
     } else {
       playSound('denied');
       setSelectedStyleId(style.id);
       setLockedNotice(
-        `[ACCESS RESTRICTED] ${style.name} is currently locked for this tournament tier. Only MELEE is cleared for deployment.`
+        `[ACCESS RESTRICTED] ${style.name} is currently locked for this tournament tier. FOX McCLOUD (MELEE) and ARCHERY (PLASMA SNIPER) are cleared for deployment.`
       );
     }
   };
@@ -183,6 +189,9 @@ export const CharacterSelect: React.FC = () => {
     if (!selectedStyle.isPlayable) {
       playSound('denied');
       return;
+    }
+    if (selectedStyle.id === 'melee' || selectedStyle.id === 'archery') {
+      setStoreStyle(selectedStyle.id);
     }
     playSound('granted');
     navigate('/pre-fight');
@@ -602,6 +611,7 @@ export const CharacterSelect: React.FC = () => {
               <PlayerPreview3D
                 glowColor={selectedStyle.accentColor}
                 isMelee={selectedStyle.id === 'melee'}
+                selectedStyle={selectedStyle.id as 'melee' | 'archery'}
               />
             </div>
 

@@ -21,13 +21,18 @@ export const PreFight: React.FC = () => {
   const navigate = useNavigate();
   const { player } = useAuth();
   const { playSound } = useSound();
-  const { selectedCostume, setCostume } = useCostumeStore();
+  const { selectedCostume, setCostume, selectedStyle } = useCostumeStore();
+  const isArchery = selectedStyle === 'archery';
 
-  // Weapon Loadout state (Defaults to Tome of Wisdom from Book scan)
-  const [selectedWeapon, setSelectedWeapon] = useState<string>('TOME OF WISDOM');
-  const [weaponType, setWeaponType] = useState<string>('Staff');
-  const [weaponBonus, setWeaponBonus] = useState<string>('+15% Ability Power');
-  const [detectedItem, setDetectedItem] = useState<string>('Book');
+  // Weapon Loadout state
+  const [selectedWeapon, setSelectedWeapon] = useState<string>(
+    isArchery ? 'VORTEX PLASMA BOW' : 'TOME OF WISDOM'
+  );
+  const [weaponType, setWeaponType] = useState<string>(isArchery ? 'Plasma Bow' : 'Staff');
+  const [weaponBonus, setWeaponBonus] = useState<string>(
+    isArchery ? '+20% Precision Range' : '+15% Ability Power'
+  );
+  const [detectedItem, setDetectedItem] = useState<string>(isArchery ? 'Cyber Bow' : 'Book');
   const [weaponRarity, setWeaponRarity] = useState<string>('MYTHICAL');
 
   // Camera Scanner modal state
@@ -49,23 +54,34 @@ export const PreFight: React.FC = () => {
         setDetectedItem(parsed.detectedItem);
         setWeaponRarity(parsed.rarity || 'LEGENDARY');
       } else {
-        // Seed initial default loadout
-        const defaultWeapon: ScannedWeaponResult = {
-          detectedItem: 'Book',
-          weapon: 'Tome of Wisdom',
-          type: 'Staff',
-          bonus: '+15% Ability Power',
-          powerBonusPercent: 15,
-          lore: 'Ancient codex inscribed with arcane quantum telemetry, amplifying strike resonance.',
-          rarity: 'MYTHICAL',
-          source: 'DEFAULT_SYNTHESIS',
-        };
+        // Seed initial default loadout based on chosen combat style
+        const defaultWeapon: ScannedWeaponResult = isArchery
+          ? {
+              detectedItem: 'Cyber Bow',
+              weapon: 'Vortex Plasma Bow',
+              type: 'Plasma Bow',
+              bonus: '+20% Precision Range',
+              powerBonusPercent: 20,
+              lore: 'High-voltage twin-limb plasma bow firing hyper-accelerated photonic arrows.',
+              rarity: 'MYTHICAL',
+              source: 'ARCHERY_SYNTHESIS',
+            }
+          : {
+              detectedItem: 'Book',
+              weapon: 'Tome of Wisdom',
+              type: 'Staff',
+              bonus: '+15% Ability Power',
+              powerBonusPercent: 15,
+              lore: 'Ancient codex inscribed with arcane quantum telemetry, amplifying strike resonance.',
+              rarity: 'MYTHICAL',
+              source: 'DEFAULT_SYNTHESIS',
+            };
         localStorage.setItem('playnexus_equipped_weapon', JSON.stringify(defaultWeapon));
       }
     } catch {
       // Ignored
     }
-  }, []);
+  }, [isArchery]);
 
   const handleEquipWeapon = (weapon: ScannedWeaponResult) => {
     setSelectedWeapon(weapon.weapon);
@@ -313,11 +329,11 @@ export const PreFight: React.FC = () => {
                 style={{
                   fontFamily: 'var(--font-mono, monospace)',
                   fontSize: '0.78rem',
-                  color: 'var(--accent-cyan, #00f0ff)',
+                  color: isArchery ? '#c084fc' : 'var(--accent-cyan, #00f0ff)',
                   marginTop: '2px',
                 }}
               >
-                FIGHTING STYLE: MELEE BRAWLER
+                FIGHTING STYLE: {isArchery ? 'ARCHERY // PLASMA SNIPER' : 'MELEE // FOX McCLOUD'}
               </div>
             </div>
 
