@@ -1,22 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   transcribeAudioWithGroq,
   hasGroqApiKey,
   getGroqApiKey,
 } from '../services/groqWhisperService';
 import { useSound } from './useSound';
-
-export interface VoiceCommandHandlers {
-  onAttack?: () => void;
-  onBlock?: () => void;
-  onDodge?: () => void;
-  onSpecial?: () => void;
-  onRestart?: () => void;
-  onNavigate?: (path: string) => void;
-  onMuteToggle?: () => void;
-  onStyleSelect?: (style: 'melee' | 'archery') => void;
-  onCostumeSelect?: (costume: string) => void;
-}
+import { useCommandStore, type CombatActionHandlers } from '../store/commandStore';
 
 export interface UseVoiceCommandsResult {
   isSupported: boolean;
@@ -25,43 +15,59 @@ export interface UseVoiceCommandsResult {
   engine: 'groq' | 'webspeech';
   lastCommand: string | null;
   recognizedText: string | null;
+  lastResponse: string | null;
   error: string | null;
   hasGroqKey: boolean;
+  audioLevel: number;
   startListening: () => void;
   stopListening: () => void;
   toggleListening: () => void;
   processTranscript: (text: string) => string | null;
 }
 
-export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceCommandsResult {
-  const { playSound } = useSound();
-  const [isSupported, setIsSupported] = useState<boolean>(true);
-  const [isListening, setIsListening] = useState<boolean>(false);
-  const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
-  const [engine, setEngine] = useState<'groq' | 'webspeech'>('groq');
-  const [lastCommand, setLastCommand] = useState<string | null>(null);
-  const [recognizedText, setRecognizedText] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function useVoiceCommands(handlers?: CombatActionHandlers): UseVoiceCommandsResult {
+  const navigate = useNavigate();
+  const { playSound, toggleMute } = useSound();
+  const commandStore = useCommandStore();
 
-  // Groq MediaRecorder state
+  const [isSupported, setIsSupported] = useState<boolean>(true);
+  const [engine, setEngine] = useState<'groq' | 'webspeech'>('groq');
+
+  // Audio / MediaRecorder refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Web Speech Fallback state
+  // Audio Analysis & Silence Detection
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const maxRecordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasSpokenRef = useRef<boolean>(false);
+
+  // Web Speech Fallback
   const recognitionRef = useRef<any>(null);
-
   const isListeningRef = useRef<boolean>(false);
-  const clearCommandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handlersRef = useRef<VoiceCommandHandlers>(handlers);
 
+  // If combat handlers are provided (e.g. from CombatArena), register proxy in the store
+  const handlersRef = useRef<CombatActionHandlers | undefined>(handlers);
   useEffect(() => {
     handlersRef.current = handlers;
-  }, [handlers]);
+    if (handlers) {
+      commandStore.registerCombatHandlers({
+        onAttack: () => handlersRef.current?.onAttack?.(),
+        onBlock: () => handlersRef.current?.onBlock?.(),
+        onDodge: () => handlersRef.current?.onDodge?.(),
+        onSpecial: () => handlersRef.current?.onSpecial?.(),
+        onRestart: () => handlersRef.current?.onRestart?.(),
+      });
+      return () => {
+        commandStore.registerCombatHandlers(null);
+      };
+    }
+  }, [handlers, commandStore]);
 
-  const hasKey = hasGroqApiKey();
-
-  // Check hardware / browser support
   useEffect(() => {
     const hasMedia = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
     const hasSpeech =
@@ -72,134 +78,56 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
   }, []);
 
   /**
-   * Process raw text from either Groq Whisper or Web Speech
+   * Cleanup audio analysis nodes and tracks
    */
-  const processTranscript = useCallback((rawTranscript: string): string | null => {
-    const text = rawTranscript.trim().toLowerCase();
-    if (!text) return null;
-
-    setRecognizedText(text);
-
-    let detected: string | null = null;
-    let targetPath: string | null = null;
-
-    // 1. Combat Commands
-    if (text.includes('attack') || text.includes('strike') || text.includes('punch') || text.includes('hit') || text.includes('shoot')) {
-      detected = 'ATTACK';
-      handlersRef.current.onAttack?.();
-    } else if (text.includes('block') || text.includes('guard') || text.includes('shield') || text.includes('defend') || text.includes('reflector') || text.includes('shine')) {
-      detected = 'BLOCK';
-      handlersRef.current.onBlock?.();
-    } else if (text.includes('dodge') || text.includes('dash') || text.includes('evade') || text.includes('roll') || text.includes('slide')) {
-      detected = 'DODGE';
-      handlersRef.current.onDodge?.();
-    } else if (text.includes('special') || text.includes('ultimate') || text.includes('blaster') || text.includes('laser') || text.includes('volley') || text.includes('super')) {
-      detected = 'SPECIAL';
-      handlersRef.current.onSpecial?.();
-    } else if (text.includes('restart') || text.includes('rematch') || text.includes('retry') || text.includes('reset')) {
-      detected = 'RESTART_MATCH';
-      handlersRef.current.onRestart?.();
+  const cleanupAudioStream = useCallback(() => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
     }
-
-    // 2. Global Navigation Commands
-    else if (text.includes('character') || text.includes('fighter') || text.includes('select character')) {
-      detected = 'NAVIGATE_CHARACTER_SELECT';
-      targetPath = '/character-select';
-    } else if (text.includes('arena') || text.includes('battle') || text.includes('combat') || text.includes('start fight') || text.includes('play')) {
-      detected = 'NAVIGATE_ARENA';
-      targetPath = '/arena';
-    } else if (text.includes('pre-fight') || text.includes('prefight') || text.includes('lobby')) {
-      detected = 'NAVIGATE_PREFIGHT';
-      targetPath = '/pre-fight';
-    } else if (text.includes('leaderboard') || text.includes('ranking') || text.includes('top players')) {
-      detected = 'NAVIGATE_LEADERBOARD';
-      targetPath = '/leaderboard';
-    } else if (text.includes('analysis') || text.includes('telemetry') || text.includes('stats') || text.includes('metrics')) {
-      detected = 'NAVIGATE_ANALYSIS';
-      targetPath = '/analysis';
-    } else if (text.includes('setting') || text.includes('config') || text.includes('option')) {
-      detected = 'NAVIGATE_SETTINGS';
-      targetPath = '/settings';
-    } else if (text.includes('home') || text.includes('menu') || text.includes('main menu')) {
-      detected = 'NAVIGATE_HOME';
-      targetPath = '/';
-    } else if (text.includes('login') || text.includes('sign in')) {
-      detected = 'NAVIGATE_LOGIN';
-      targetPath = '/login';
-    } else if (text.includes('register') || text.includes('sign up')) {
-      detected = 'NAVIGATE_REGISTER';
-      targetPath = '/register';
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
-
-    // 3. Audio Commands
-    else if (text.includes('unmute') || text.includes('sound on') || text.includes('audio on')) {
-      detected = 'UNMUTE_AUDIO';
-      handlersRef.current.onMuteToggle?.();
-    } else if (text.includes('mute') || text.includes('silence') || text.includes('sound off') || text.includes('audio off')) {
-      detected = 'MUTE_AUDIO';
-      handlersRef.current.onMuteToggle?.();
+    if (maxRecordingTimerRef.current) {
+      clearTimeout(maxRecordingTimerRef.current);
+      maxRecordingTimerRef.current = null;
     }
-
-    // 4. Combat Style & Costume Selection
-    else if (text.includes('archery') || text.includes('archer') || text.includes('bow')) {
-      detected = 'STYLE_ARCHERY';
-      handlersRef.current.onStyleSelect?.('archery');
-    } else if (text.includes('melee') || text.includes('striker') || text.includes('fox')) {
-      detected = 'STYLE_MELEE';
-      handlersRef.current.onStyleSelect?.('melee');
-    } else if (text.includes('classic') || text.includes('white fox')) {
-      detected = 'COSTUME_CLASSIC';
-      handlersRef.current.onCostumeSelect?.('classic');
-    } else if (text.includes('crimson') || text.includes('red fox')) {
-      detected = 'COSTUME_RED';
-      handlersRef.current.onCostumeSelect?.('red');
-    } else if (text.includes('sector z') || text.includes('blue fox')) {
-      detected = 'COSTUME_BLUE';
-      handlersRef.current.onCostumeSelect?.('blue');
-    } else if (text.includes('recon') || text.includes('green fox')) {
-      detected = 'COSTUME_GREEN';
-      handlersRef.current.onCostumeSelect?.('green');
-    } else if (text.includes('shadow') || text.includes('dark fox')) {
-      detected = 'COSTUME_DARK';
-      handlersRef.current.onCostumeSelect?.('dark');
-    }
-
-    if (detected) {
-      playSound('voice_success');
-      setLastCommand(detected);
-
-      if (targetPath) {
-        handlersRef.current.onNavigate?.(targetPath);
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        audioContextRef.current.close();
+      } catch {
+        // Ignored
       }
-
-      // Broadcast globally so any mounted page/component can listen
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('playnexus_voice_command', {
-            detail: {
-              command: detected,
-              targetPath,
-              rawTranscript,
-            },
-          })
-        );
-      }
-
-      if (clearCommandTimerRef.current) clearTimeout(clearCommandTimerRef.current);
-      clearCommandTimerRef.current = setTimeout(() => {
-        setLastCommand(null);
-      }, 3000);
+      audioContextRef.current = null;
     }
-
-    return detected;
-  }, [playSound]);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    commandStore.setAudioLevel(0);
+    hasSpokenRef.current = false;
+  }, [commandStore]);
 
   /**
-   * Stop listening / recording
+   * Process raw text from Groq Whisper or Web Speech
+   */
+  const processTranscript = useCallback(
+    (rawTranscript: string): string | null => {
+      const res = commandStore.executeCommand(rawTranscript, navigate, toggleMute, playSound);
+      return res.command;
+    },
+    [commandStore, navigate, toggleMute, playSound]
+  );
+
+  /**
+   * Stop listening and record / transcribe
    */
   const stopListening = useCallback(() => {
+    if (!isListeningRef.current && !commandStore.isListening) return;
+
     isListeningRef.current = false;
-    setIsListening(false);
+    commandStore.setIsListening(false);
     playSound('voice_stop');
 
     // Stop Groq MediaRecorder
@@ -211,12 +139,6 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
       }
     }
 
-    // Stop MediaStream tracks
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-
     // Stop Web Speech if running
     if (recognitionRef.current) {
       try {
@@ -225,38 +147,88 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
         // Ignored
       }
     }
-  }, [playSound]);
+
+    cleanupAudioStream();
+  }, [commandStore, cleanupAudioStream, playSound]);
 
   /**
-   * Start listening / recording with Groq Whisper (or fallback to Web Speech)
+   * Start listening with Groq Whisper & Real-time Silence Detector
    */
   const startListening = useCallback(async () => {
-    setError(null);
+    commandStore.setError(null);
     const key = getGroqApiKey();
 
-    // Strategy A: If Groq API Key exists, use high-fidelity Groq Whisper
+    // Strategy A: Groq Whisper with VAD / Silence Detection
     if (key && key.length >= 10 && navigator.mediaDevices?.getUserMedia) {
       try {
         setEngine('groq');
         playSound('voice_start');
         audioChunksRef.current = [];
+        hasSpokenRef.current = false;
 
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
-            sampleRate: 44100,
+            autoGainControl: true,
           },
         });
         streamRef.current = stream;
 
-        // Choose best supported mime type
+        // Set up Web Audio Analyser for live visualizer & silence detection
+        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioCtxClass();
+        audioContextRef.current = audioCtx;
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyserRef.current = analyser;
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const checkAudioLevels = () => {
+          if (!analyserRef.current || !isListeningRef.current) return;
+
+          analyserRef.current.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          const level = Math.min(100, Math.round((avg / 128) * 100));
+          commandStore.setAudioLevel(level);
+
+          // Speech vs Silence Logic
+          if (level > 12) {
+            // Speaking detected
+            hasSpokenRef.current = true;
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current);
+              silenceTimerRef.current = null;
+            }
+          } else if (hasSpokenRef.current) {
+            // User spoke and is now silent: auto-stop after 1.1s of quiet
+            if (!silenceTimerRef.current) {
+              silenceTimerRef.current = setTimeout(() => {
+                stopListening();
+              }, 1100);
+            }
+          }
+
+          animFrameRef.current = requestAnimationFrame(checkAudioLevels);
+        };
+
+        // Safety cap: max 7 seconds recording
+        maxRecordingTimerRef.current = setTimeout(() => {
+          stopListening();
+        }, 7000);
+
+        // MediaRecorder setup
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
           : MediaRecorder.isTypeSupported('audio/webm')
           ? 'audio/webm'
-          : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-          ? 'audio/ogg;codecs=opus'
           : '';
 
         const mediaRecorder = mimeType
@@ -273,8 +245,9 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
 
         mediaRecorder.onstart = () => {
           isListeningRef.current = true;
-          setIsListening(true);
-          setError(null);
+          commandStore.setIsListening(true);
+          commandStore.setError(null);
+          animFrameRef.current = requestAnimationFrame(checkAudioLevels);
         };
 
         mediaRecorder.onstop = async () => {
@@ -284,29 +257,28 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
           audioChunksRef.current = [];
 
           if (audioBlob.size > 200) {
-            setIsTranscribing(true);
+            commandStore.setIsTranscribing(true);
             try {
               const result = await transcribeAudioWithGroq(audioBlob);
               if (result.error) {
-                setError(result.error);
+                commandStore.setError(result.error);
                 playSound('voice_error');
               } else if (result.text) {
                 processTranscript(result.text);
               }
             } catch (err: any) {
-              setError(err?.message || 'Whisper transcription failed.');
+              commandStore.setError(err?.message || 'Whisper transcription failed.');
               playSound('voice_error');
             } finally {
-              setIsTranscribing(false);
+              commandStore.setIsTranscribing(false);
             }
           }
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(250);
         return;
       } catch (micErr: any) {
-        console.warn('[VOICE] Groq Mic access error, trying fallback:', micErr);
-        // Fall back to Web Speech
+        console.warn('[VOICE] Mic error, falling back to Web Speech:', micErr);
       }
     }
 
@@ -316,7 +288,7 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
 
     if (!SpeechRecognition) {
       setIsSupported(false);
-      setError('Please add a Groq API Key or use a browser supporting Web Speech API.');
+      commandStore.setError('Please configure Groq API Key or use Chrome/Edge for voice.');
       playSound('voice_error');
       return;
     }
@@ -332,8 +304,8 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
 
       recognition.onstart = () => {
         isListeningRef.current = true;
-        setIsListening(true);
-        setError(null);
+        commandStore.setIsListening(true);
+        commandStore.setError(null);
       };
 
       recognition.onresult = (event: any) => {
@@ -345,44 +317,45 @@ export function useVoiceCommands(handlers: VoiceCommandHandlers = {}): UseVoiceC
       };
 
       recognition.onerror = (event: any) => {
-        console.warn('[VOICE] Speech recognition error:', event.error);
         if (event.error !== 'no-speech') {
-          setError(`Speech: ${event.error}`);
+          commandStore.setError(`Speech: ${event.error}`);
           playSound('voice_error');
         }
-        setIsListening(false);
+        commandStore.setIsListening(false);
         isListeningRef.current = false;
       };
 
       recognition.onend = () => {
-        setIsListening(false);
+        commandStore.setIsListening(false);
         isListeningRef.current = false;
       };
 
       recognition.start();
     } catch (e: any) {
-      setError(e?.message || 'Failed to start speech recognition.');
+      commandStore.setError(e?.message || 'Failed to start speech recognition.');
       playSound('voice_error');
     }
-  }, [playSound, processTranscript]);
+  }, [commandStore, playSound, processTranscript, stopListening]);
 
   const toggleListening = useCallback(() => {
-    if (isListening) {
+    if (commandStore.isListening || isListeningRef.current) {
       stopListening();
     } else {
       startListening();
     }
-  }, [isListening, startListening, stopListening]);
+  }, [commandStore.isListening, startListening, stopListening]);
 
   return {
     isSupported,
-    isListening,
-    isTranscribing,
+    isListening: commandStore.isListening,
+    isTranscribing: commandStore.isTranscribing,
     engine,
-    lastCommand,
-    recognizedText,
-    error,
-    hasGroqKey: hasKey,
+    lastCommand: commandStore.lastCommand,
+    recognizedText: commandStore.recognizedText,
+    lastResponse: commandStore.lastResponse,
+    error: commandStore.error,
+    hasGroqKey: hasGroqApiKey(),
+    audioLevel: commandStore.audioLevel,
     startListening,
     stopListening,
     toggleListening,
