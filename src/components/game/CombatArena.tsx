@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import confetti from 'canvas-confetti';
@@ -32,6 +32,17 @@ const MOVEMENT_SPEED = 5.2;
 const ATTACK_RANGE = 2.2;
 const PLAYER_MAX_HP = 100;
 const ENEMY_MAX_HP = 100;
+
+const ShadowMapFix: React.FC = () => {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = THREE.PCFShadowMap;
+  }, [gl]);
+
+  return null;
+};
 
 /**
  * Arena Game Loop Tick Helper (ticks DodgeLockManager, buffs, and challenge countdowns)
@@ -377,6 +388,7 @@ const PlayerFighter: React.FC<PlayerFighterProps> = ({
           isHit={isHit}
           isDead={isDead}
           isMoving={isMoving}
+          weapon={selectedStyle === 'sword' ? 'sword' : 'melee'}
         />
       )}
     </group>
@@ -513,6 +525,7 @@ const EnemyFighter: React.FC<EnemyFighterProps> = ({
           isHit={isHit}
           isDead={isDead}
           isMoving={isMoving}
+          weapon={selectedStyle === 'sword' ? 'sword' : 'melee'}
         />
       )}
     </group>
@@ -648,8 +661,11 @@ const JungleSporeParticles3D: React.FC = () => {
 /**
  * Fighting Ground Stage with Support for Colosseum and Overgrown Cyber-Jungle Themes
  */
-const PlayableArenaStage: React.FC<{ theme?: StageTheme }> = ({ theme = 'colosseum' }) => {
+const PlayableArenaStage: React.FC<{ theme?: StageTheme; selectedStyle?: CombatStyle }> = ({ theme = 'colosseum', selectedStyle = 'melee' }) => {
   const isJungle = theme === 'jungle';
+  const isShipyard = theme === 'shipyard';
+  const isWrestling = selectedStyle === 'wrestling';
+  const ringRadius = isWrestling ? 4.6 : ARENA_RADIUS;
 
   const pylonPositions = React.useMemo(() => {
     const pylons: [number, number, number][] = [];
@@ -685,62 +701,127 @@ const PlayableArenaStage: React.FC<{ theme?: StageTheme }> = ({ theme = 'colosse
     <group position={[0, 0, 0]}>
       {/* Central Fighting Platform */}
       <mesh receiveShadow position={[0, 0, 0]}>
-        <cylinderGeometry args={[ARENA_RADIUS + 0.5, ARENA_RADIUS + 1.2, 0.4, 64]} />
+        <cylinderGeometry args={[ringRadius + 0.5, ringRadius + 1.1, isWrestling ? 0.48 : 0.4, 64]} />
         <meshStandardMaterial
-          color={isJungle ? '#142a1e' : '#d6b38f'}
-          roughness={isJungle ? 0.9 : 0.85}
-          metalness={0.05}
+          color={isShipyard ? '#1e293b' : isWrestling ? '#101827' : isJungle ? '#142a1e' : '#d6b38f'}
+          roughness={isShipyard ? 0.8 : isWrestling ? 0.7 : isJungle ? 0.9 : 0.85}
+          metalness={isShipyard ? 0.5 : isWrestling ? 0.35 : 0.05}
         />
       </mesh>
 
-      {/* Surrounding Vast Ground Floor */}
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.11, 0]}>
-        <circleGeometry args={[65, 64]} />
-        <meshStandardMaterial
-          color={isJungle ? '#062016' : '#d4b28c'}
-          roughness={0.92}
-        />
-      </mesh>
+      {isShipyard && (
+        <>
+          <mesh position={[0, 0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[ringRadius + 0.45, ringRadius + 0.8, 64]} />
+            <meshBasicMaterial color="#f59e0b" transparent opacity={0.35} side={THREE.DoubleSide} />
+          </mesh>
+          {[-1, 1].map((side) => (
+            <group key={side} position={[side * (ringRadius + 2.5), 1.4, 0]}>
+              <mesh castShadow position={[0, 0, 0]}>
+                <boxGeometry args={[0.5, 2.8, 0.5]} />
+                <meshStandardMaterial color="#475569" metalness={0.8} roughness={0.4} />
+              </mesh>
+              <mesh castShadow position={[0, 1.7, 0]}>
+                <boxGeometry args={[2.4, 0.28, 0.3]} />
+                <meshStandardMaterial color="#e2e8f0" metalness={0.7} roughness={0.35} />
+              </mesh>
+            </group>
+          ))}
+          {[-1, 1].map((side) => (
+            <group key={`dock-${side}`} position={[side * (ringRadius + 4.5), 0.1, 0]}>
+              <mesh receiveShadow position={[0, 0, 0]}>
+                <boxGeometry args={[2.2, 0.2, 5.6]} />
+                <meshStandardMaterial color="#334155" metalness={0.6} roughness={0.9} />
+              </mesh>
+            </group>
+          ))}
+        </>
+      )}
 
-      {/* Outer Boundary Ring */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
-        <ringGeometry args={[ARENA_RADIUS - 0.14, ARENA_RADIUS + 0.14, 64]} />
-        <meshStandardMaterial
-          color={isJungle ? '#064e3b' : '#b58d63'}
-          roughness={0.8}
-        />
-      </mesh>
+      {/* Wresting Ring Mat / Standard Arena Floor */}
+      {isWrestling ? (
+        <>
+          <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+            <circleGeometry args={[ringRadius + 0.45, 64]} />
+            <meshStandardMaterial color="#111827" roughness={0.9} />
+          </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.18, 0]}>
+            <ringGeometry args={[ringRadius - 0.1, ringRadius + 0.1, 64]} />
+            <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} />
+          </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.2, 0]}>
+            <ringGeometry args={[ringRadius - 0.35, ringRadius - 0.22, 64]} />
+            <meshBasicMaterial color="#f8fafc" side={THREE.DoubleSide} transparent opacity={0.85} />
+          </mesh>
 
-      {/* Bioluminescent Rune Ring / Golden Martial Border */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.212, 0]}>
-        <ringGeometry args={[ARENA_RADIUS - 0.04, ARENA_RADIUS + 0.04, 64]} />
-        <meshBasicMaterial
-          color={isJungle ? '#10b981' : '#eab308'}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+          {[
+            [0, 0],
+            [Math.PI / 2, 1],
+            [Math.PI, 2],
+            [-Math.PI / 2, 3],
+          ].map(([angle, key]) => (
+            <group key={key} rotation={[0, angle, 0]}>
+              <mesh position={[0, 0.45, ringRadius + 0.18]}>
+                <boxGeometry args={[ringRadius * 1.35, 0.08, 0.08]} />
+                <meshStandardMaterial color="#f8fafc" emissive="#f8fafc" emissiveIntensity={0.25} />
+              </mesh>
+            </group>
+          ))}
 
-      {/* Inner Hazard Warning Ring */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
-        <ringGeometry args={[3.4, 3.55, 48]} />
-        <meshBasicMaterial
-          color={isJungle ? '#047857' : '#dc2626'}
-          side={THREE.DoubleSide}
-          transparent
-          opacity={0.65}
-        />
-      </mesh>
+          {[[-ringRadius - 0.2, 0], [ringRadius + 0.2, 0], [0, -ringRadius - 0.2], [0, ringRadius + 0.2]].map(([x, z], idx) => (
+            <mesh key={idx} position={[x, 0.55, z]} castShadow>
+              <cylinderGeometry args={[0.12, 0.12, 1.1, 12]} />
+              <meshStandardMaterial color="#f8fafc" metalness={0.4} roughness={0.35} />
+            </mesh>
+          ))}
+        </>
+      ) : (
+        <>
+          <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.11, 0]}>
+            <circleGeometry args={[65, 64]} />
+            <meshStandardMaterial
+              color={isJungle ? '#062016' : '#d4b28c'}
+              roughness={0.92}
+            />
+          </mesh>
 
-      {/* Center Sacred Seal */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
-        <ringGeometry args={[1.1, 1.25, 32]} />
-        <meshBasicMaterial
-          color={isJungle ? '#34d399' : '#d4af37'}
-          side={THREE.DoubleSide}
-          transparent
-          opacity={0.85}
-        />
-      </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
+            <ringGeometry args={[ARENA_RADIUS - 0.14, ARENA_RADIUS + 0.14, 64]} />
+            <meshStandardMaterial
+              color={isJungle ? '#064e3b' : '#b58d63'}
+              roughness={0.8}
+            />
+          </mesh>
+
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.212, 0]}>
+            <ringGeometry args={[ARENA_RADIUS - 0.04, ARENA_RADIUS + 0.04, 64]} />
+            <meshBasicMaterial
+              color={isJungle ? '#10b981' : '#eab308'}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
+            <ringGeometry args={[3.4, 3.55, 48]} />
+            <meshBasicMaterial
+              color={isJungle ? '#047857' : '#dc2626'}
+              side={THREE.DoubleSide}
+              transparent
+              opacity={0.65}
+            />
+          </mesh>
+
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.21, 0]}>
+            <ringGeometry args={[1.1, 1.25, 32]} />
+            <meshBasicMaterial
+              color={isJungle ? '#34d399' : '#d4af37'}
+              side={THREE.DoubleSide}
+              transparent
+              opacity={0.85}
+            />
+          </mesh>
+        </>
+      )}
 
       {/* Floor Grid Helper */}
       <gridHelper
@@ -901,7 +982,8 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
   // Costume, Stage Theme & Combat Style
   const { selectedCostume, stageTheme, selectedStyle } = useCostumeStore();
   const isArchery = selectedStyle === 'archery';
-  const effectiveStageTheme: StageTheme = isArchery ? 'jungle' : stageTheme;
+  const isDefenseStyle = selectedStyle === 'defense';
+  const effectiveStageTheme: StageTheme = isArchery ? 'jungle' : isDefenseStyle ? 'shipyard' : stageTheme;
 
   // Demo Mode Store State
   const {
@@ -1056,8 +1138,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       return;
     }
 
-    // Melee Mode: Close-range physical attack
-    playSound('pulse');
+    // Sword Mode: Close-range blade slash with heavier damage and a distinct slash feel.
+    const swordAttackDamage = 18;
+    playSound(selectedStyle === 'sword' ? 'pulse' : 'pulse');
 
     setTimeout(() => {
       const currentDist = playerPosRef.current.distanceTo(enemyPosRef.current);
@@ -1313,7 +1396,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       return;
     }
 
-    // Melee / Fox McCloud: Close-Range Strike
+    // Melee / Sword: Close-Range Strike
     setIsPlayerAttacking(true);
     playSound('attack');
     playSound('pulse');
@@ -1327,16 +1410,16 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     });
 
     setTimeout(() => {
-      if (dist <= ATTACK_RANGE && !isVictory && !isDefeat) {
+      if (dist <= (selectedStyle === 'sword' ? ATTACK_RANGE + 0.5 : ATTACK_RANGE) && !isVictory && !isDefeat) {
         const hitX = (playerPosRef.current.x + enemyPosRef.current.x) / 2;
         const hitZ = (playerPosRef.current.z + enemyPosRef.current.z) / 2;
 
-        setHitSparks((prev) => [...prev.slice(-6), { id: Date.now(), pos: [hitX, 1.1, hitZ], color: '#00f0ff' }]);
+        setHitSparks((prev) => [...prev.slice(-6), { id: Date.now(), pos: [hitX, 1.1, hitZ], color: selectedStyle === 'sword' ? '#00ff9d' : '#00f0ff' }]);
 
         const isEnemyCurrentlyBlocking = aiControllerRef.current.isBlocking();
 
         if (isEnemyCurrentlyBlocking) {
-          const dmg = 5;
+          const dmg = selectedStyle === 'sword' ? 7 : 5;
           const nextEnemyHp = Math.max(0, enemyHp - dmg);
           setEnemyHp(nextEnemyHp);
           playSound('scan');
@@ -1358,7 +1441,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
           setComboCount(newCombo);
 
           const isCrit = newCombo >= 3;
-          const baseDmg = isCrit ? 26 : 16;
+          const baseDmg = selectedStyle === 'sword' ? (isCrit ? 32 : 20) : (isCrit ? 26 : 16);
           const weaponMultiplier = equippedWeapon?.powerBonusPercent
             ? 1 + equippedWeapon.powerBonusPercent / 100
             : 1.0;
@@ -1373,9 +1456,9 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
             playSound('granted');
           }
 
-          const weaponTag = equippedWeapon ? ` [${equippedWeapon.weapon.toUpperCase()}]` : '';
+          const weaponTag = equippedWeapon ? ` [${equippedWeapon.weapon.toUpperCase()}]` : selectedStyle === 'sword' ? ' [SWORD]' : '';
           setLastDamageEvent({
-            text: isCrit ? `CRITICAL COMBO!${weaponTag} -${dmg} HP` : `HIT!${weaponTag} -${dmg} HP`,
+            text: isCrit ? `CRITICAL SWORD SLASH!${weaponTag} -${dmg} HP` : `SWORD HIT!${weaponTag} -${dmg} HP`,
             isCrit,
             id: Date.now(),
           });
@@ -1810,12 +1893,12 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
 
       {/* 3D Canvas */}
       <Canvas
-        shadows
         dpr={[1, 1.5]}
         gl={{ powerPreference: 'high-performance', antialias: true, stencil: false }}
         camera={{ position: [0, 3.8, 7.2], fov: 45 }}
         style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
       >
+        <ShadowMapFix />
         {/* Sky & Atmosphere — switches by stage theme */}
         {effectiveStageTheme === 'jungle' ? (
           <>
@@ -1846,6 +1929,16 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
             <directionalLight position={[-20, 25, -20]} intensity={0.8} color="#818cf8" />
             <pointLight position={[0, 8, 0]} intensity={3} color="#7c3aed" distance={20} />
           </>
+        ) : effectiveStageTheme === 'shipyard' ? (
+          <>
+            <color attach="background" args={['#070d16']} />
+            <fog attach="fog" args={['#0b1722', 24, 120]} />
+            <ambientLight intensity={0.8} color="#dbeafe" />
+            <hemisphereLight groundColor="#1e293b" color="#a5b4fc" intensity={0.7} />
+            <directionalLight position={[30, 24, 18]} intensity={1.8} color="#f8fafc" castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+            <directionalLight position={[-24, 18, -10]} intensity={0.8} color="#fbbf24" />
+            <pointLight position={[0, 4, 0]} intensity={2.1} color="#fbbf24" distance={24} />
+          </>
         ) : (
           <>
             <color attach="background" args={['#9fc5ec']} />
@@ -1865,7 +1958,7 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
         {effectiveStageTheme === 'jungle' ? <JungleSporeParticles3D /> : <SunParticles3D />}
 
         {/* Arena Stage */}
-        <PlayableArenaStage theme={effectiveStageTheme} />
+        <PlayableArenaStage theme={effectiveStageTheme} selectedStyle={selectedStyle} />
 
         {/* Dynamic Hit Sparks */}
         {hitSparks.map((spark) => (

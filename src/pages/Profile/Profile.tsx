@@ -34,6 +34,8 @@ const dnaMetrics = [
 ] as const;
 
 const formatDNAValue = (key: string, value: any) => {
+  if (value === undefined) return 'N/A';
+  if (Array.isArray(value)) return value[0] ? String(value[0]).toUpperCase() : 'N/A';
   if (key === 'reactionTime') return `${Number(value).toFixed(2)}s`;
   if (key === 'preferredRange') return String(value).toUpperCase();
   if (typeof value === 'number') return `${Math.round(value * 100)}%`;
@@ -279,7 +281,8 @@ export const Profile: React.FC = () => {
 
             <div style={{ display: 'grid', gap: '12px', marginTop: '20px' }}>
               {dnaMetrics.map((metric) => {
-                const value = profile.fightingDNA[metric.key as keyof typeof profile.fightingDNA];
+                const dnaRecord = profile.fightingDNA as unknown as Record<string, number | string | string[] | undefined>;
+                const value = dnaRecord[metric.key];
                 return (
                   <div key={metric.label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '12px 14px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>

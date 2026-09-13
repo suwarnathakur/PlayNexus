@@ -20,6 +20,7 @@ export class AIController {
   private approachSpeed: number = 2.8;
   private retreatSpeed: number = 3.6;
   private dodgeSpeed: number = 5.0;
+  private lastShotAt: number = 0;
 
   private callbacks: AIControllerCallbacks;
   private adaptiveAI?: AdaptiveAI;
@@ -102,53 +103,107 @@ export class AIController {
     // Handle Active State Behaviors
     switch (this.currentState) {
       case 'APPROACH': {
-        // Move towards player (with adaptive intercept bias if countering dodge)
         const dir = this.adaptiveAI
           ? this.adaptiveAI.calculateInterceptVector(enemyPos, playerPos)
           : new THREE.Vector3().subVectors(playerPos, enemyPos).setY(0);
 
         const currentDist = enemyPos.distanceTo(playerPos);
-        const MIN_COMBAT_DISTANCE = fullCtx.combatStyle === 'archery' ? 4.2 : 1.85; // Maintain sniper range in archery mode
+        const style = fullCtx.combatStyle || 'melee';
+        const isArcheryStyle = style === 'archery';
+        const isWrestlingStyle = style === 'wrestling';
+        const MIN_COMBAT_DISTANCE = isArcheryStyle ? 4.2 : isWrestlingStyle ? 1.3 : 1.85;
+        const idealMaxRange = isArcheryStyle ? 5.1 : isWrestlingStyle ? 1.8 : 2.3;
 
-        if (currentDist > MIN_COMBAT_DISTANCE && dir.length() > 0.05) {
+        if (dir.length() > 0.05) {
           dir.normalize();
           const effectiveSpeed = this.adaptiveAI
             ? this.adaptiveAI.getApproachSpeed(this.approachSpeed)
             : this.approachSpeed;
-          enemyPos.x += dir.x * effectiveSpeed * delta;
-          enemyPos.z += dir.z * effectiveSpeed * delta;
-        } else if (currentDist < (fullCtx.combatStyle === 'archery' ? 3.0 : 1.45)) {
-          // Push away slightly to maintain spacing and prevent clipping
-          const pushAway = new THREE.Vector3().subVectors(enemyPos, playerPos).setY(0);
-          if (pushAway.length() > 0.01) {
-            pushAway.normalize();
-            enemyPos.x += pushAway.x * 2.2 * delta;
-            enemyPos.z += pushAway.z * 2.2 * delta;
+
+          if (isArcheryStyle) {
+            if (currentDist > idealMaxRange) {
+              enemyPos.x += dir.x * effectiveSpeed * delta;
+              enemyPos.z += dir.z * effectiveSpeed * delta;
+            } else if (currentDist < MIN_COMBAT_DISTANCE) {
+              const backAway = new THREE.Vector3().subVectors(enemyPos, playerPos).setY(0);
+              if (backAway.length() > 0.01) {
+                backAway.normalize();
+                enemyPos.x += backAway.x * (this.retreatSpeed * 0.9) * delta;
+                enemyPos.z += backAway.z * (this.retreatSpeed * 0.9) * delta;
+              }
+            } else {
+              const strafe = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+              const strafeSign = Math.sin(enemyPos.x * 2.2 + enemyPos.z * 1.5) >= 0 ? 1 : -1;
+              enemyPos.x += strafe.x * (effectiveSpeed * 0.7) * delta * strafeSign;
+              enemyPos.z += strafe.z * (effectiveSpeed * 0.7) * delta * strafeSign;
+            }
+          } else if (isWrestlingStyle) {
+            if (currentDist > idealMaxRange) {
+              enemyPos.x += dir.x * (effectiveSpeed * 1.35) * delta;
+              enemyPos.z += dir.z * (effectiveSpeed * 1.35) * delta;
+            } else if (currentDist < 1.15) {
+              const pushAway = new THREE.Vector3().subVectors(enemyPos, playerPos).setY(0);
+              if (pushAway.length() > 0.01) {
+                pushAway.normalize();
+                enemyPos.x += pushAway.x * 1.8 * delta;
+                enemyPos.z += pushAway.z * 1.8 * delta;
+              }
+            } else {
+              const sidestep = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+              const jitter = Math.sin((enemyPos.x + enemyPos.z) * 4.0 + this.stateTimeRemaining * 10) >= 0 ? 1 : -1;
+              enemyPos.x += sidestep.x * effectiveSpeed * delta * 0.65 * jitter;
+              enemyPos.z += sidestep.z * effectiveSpeed * delta * 0.65 * jitter;
+            }
+          } else {
+            if (currentDist > MIN_COMBAT_DISTANCE) {
+              enemyPos.x += dir.x * effectiveSpeed * delta;
+              enemyPos.z += dir.z * effectiveSpeed * delta;
+            } else if (currentDist < 1.45) {
+              const pushAway = new THREE.Vector3().subVectors(enemyPos, playerPos).setY(0);
+              if (pushAway.length() > 0.01) {
+                pushAway.normalize();
+                enemyPos.x += pushAway.x * 2.2 * delta;
+                enemyPos.z += pushAway.z * 2.2 * delta;
+              }
+            }
           }
         }
         break;
       }
 
       case 'RETREAT': {
-        // Move away from player (escape vector)
         const dir = new THREE.Vector3().subVectors(enemyPos, playerPos);
         dir.y = 0;
         if (dir.length() > 0.1) {
           dir.normalize();
-          enemyPos.x += dir.x * this.retreatSpeed * delta;
-          enemyPos.z += dir.z * this.retreatSpeed * delta;
+          if (fullCtx.combatStyle === 'archery') {
+            const lateral = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+            const strafeBias = Math.sin(enemyPos.x * 2.5 + enemyPos.z * 2.0) >= 0 ? 1 : -1;
+            enemyPos.x += dir.x * this.retreatSpeed * delta * 0.85;
+            enemyPos.z += dir.z * this.retreatSpeed * delta * 0.85;
+            enemyPos.x += lateral.x * this.dodgeSpeed * delta * 0.45 * strafeBias;
+            enemyPos.z += lateral.z * this.dodgeSpeed * delta * 0.45 * strafeBias;
+          } else {
+            enemyPos.x += dir.x * this.retreatSpeed * delta;
+            enemyPos.z += dir.z * this.retreatSpeed * delta;
+          }
         }
         break;
       }
 
       case 'DODGE': {
-        // Quick evasive sidestep
         const dir = new THREE.Vector3().subVectors(enemyPos, playerPos);
         dir.y = 0;
-        // Sidestep perpendicularly
         const sidestep = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
-        enemyPos.x += sidestep.x * this.dodgeSpeed * delta;
-        enemyPos.z += sidestep.z * this.dodgeSpeed * delta;
+
+        if (fullCtx.combatStyle === 'archery') {
+          const strafeBias = Math.sin(enemyPos.x * 3 + enemyPos.z * 2.5) >= 0 ? 1 : -1;
+          enemyPos.x += sidestep.x * this.dodgeSpeed * delta * 0.9 * strafeBias;
+          enemyPos.z += sidestep.z * this.dodgeSpeed * delta * 0.9 * strafeBias;
+        } else {
+          enemyPos.x += sidestep.x * this.dodgeSpeed * delta;
+          enemyPos.z += sidestep.z * this.dodgeSpeed * delta;
+        }
         break;
       }
 
@@ -188,6 +243,51 @@ export class AIController {
       const angle = Math.atan2(enemyPos.z, enemyPos.x);
       enemyPos.x = Math.cos(angle) * ctx.arenaRadius;
       enemyPos.z = Math.sin(angle) * ctx.arenaRadius;
+    }
+
+    // Reactive defense: if player is attacking near the enemy, block immediately.
+    const style = fullCtx.combatStyle || 'melee';
+    const isDefenseStyle = style === 'defense';
+    const isSwordStyle = style === 'sword';
+    const playerThreatRange = style === 'archery' ? 6.5 : style === 'wrestling' ? 2.5 : 2.6;
+    const attackDistance = style === 'archery' ? 5.8 : style === 'wrestling' ? 1.75 : isDefenseStyle || isSwordStyle ? 2.7 : 2.2;
+    const sightRange = style === 'archery' ? 8.5 : style === 'wrestling' ? 3.0 : isDefenseStyle ? 4.6 : isSwordStyle ? 3.8 : 3.5;
+    const angleToPlayer = Math.atan2(playerPos.x - enemyPos.x, playerPos.z - enemyPos.z);
+    const facingAngle = Math.atan2(playerPos.x - enemyPos.x, playerPos.z - enemyPos.z);
+    const angleDelta = Math.abs(Math.atan2(Math.sin(facingAngle - angleToPlayer), Math.cos(facingAngle - angleToPlayer)));
+    const isInSight = angleDelta < 1.3;
+
+    if (ctx.isPlayerAttacking && distanceToPlayer <= playerThreatRange && this.currentState !== 'BLOCK' && this.currentState !== 'DODGE') {
+      this.transitionTo('BLOCK');
+      return;
+    }
+
+    // Reactive offense: if player is visible and within attack range, keep pressing the attack.
+    if (distanceToPlayer <= sightRange && isInSight && this.currentState !== 'ATTACK' && this.currentState !== 'BLOCK') {
+      this.transitionTo('ATTACK');
+      return;
+    }
+
+    // Defense-style pressure keeps attacking once the player is seen, even before the player starts an offense sequence.
+    if ((isDefenseStyle || isSwordStyle) && distanceToPlayer <= attackDistance && isInSight) {
+      this.transitionTo('ATTACK');
+      return;
+    }
+
+    // Extra trigger for ranged archery and close-range wrestling pressure
+    if (style === 'archery' && distanceToPlayer <= attackDistance + 2.8 && isInSight) {
+      const now = Date.now();
+      if (now - this.lastShotAt > 850) {
+        this.lastShotAt = now;
+        this.transitionTo('ATTACK');
+        this.callbacks.onAttackTrigger();
+        return;
+      }
+    }
+
+    if (style === 'wrestling' && distanceToPlayer <= attackDistance + 0.8 && isInSight) {
+      this.transitionTo('ATTACK');
+      return;
     }
 
     // State Transition Check: When timer expires, evaluate next state via AdaptiveAI or base AIStrategy

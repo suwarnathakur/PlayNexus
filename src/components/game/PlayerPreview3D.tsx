@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useEffect, useRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { FoxCharacter3D } from '../3d/FoxCharacter3D';
@@ -9,7 +9,7 @@ import { useCostumeStore } from '../../store/costumeStore';
 interface PlayerPreviewModelProps {
   glowColor?: string;
   isMelee?: boolean;
-  selectedStyle?: 'melee' | 'archery';
+  selectedStyle?: 'melee' | 'archery' | 'wrestling' | 'defense' | 'sword';
 }
 
 const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = ({ isMelee = true, selectedStyle }) => {
@@ -30,7 +30,11 @@ const PlayerPreviewModel: React.FC<PlayerPreviewModelProps> = ({ isMelee = true,
       {isArcher ? (
         <ArcherCharacter3D costume={selectedCostume} />
       ) : (
-        <FoxCharacter3D variant="fox" costume={selectedCostume} />
+        <FoxCharacter3D
+          variant="fox"
+          costume={selectedCostume}
+          weapon={selectedStyle === 'sword' ? 'sword' : 'melee'}
+        />
       )}
     </group>
   );
@@ -77,10 +81,21 @@ const PedestalStage: React.FC<{ glowColor: string }> = ({ glowColor }) => {
   );
 };
 
+const ShadowMapFix: React.FC = () => {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = THREE.PCFShadowMap;
+  }, [gl]);
+
+  return null;
+};
+
 interface PlayerPreview3DProps {
   glowColor?: string;
   isMelee?: boolean;
-  selectedStyle?: 'melee' | 'archery';
+  selectedStyle?: 'melee' | 'archery' | 'wrestling' | 'defense' | 'sword';
 }
 
 export const PlayerPreview3D: React.FC<PlayerPreview3DProps> = ({
@@ -91,10 +106,10 @@ export const PlayerPreview3D: React.FC<PlayerPreview3DProps> = ({
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '380px', position: 'relative' }}>
       <Canvas
-        shadows
         camera={{ position: [0, 0.25, 3.6], fov: 40 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
       >
+        <ShadowMapFix />
         <ambientLight intensity={0.9} />
         <directionalLight position={[3, 5, 4]} intensity={2.2} castShadow />
         <directionalLight position={[-3, 2, -2]} intensity={0.8} color={glowColor} />

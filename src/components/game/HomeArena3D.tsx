@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useEffect, useRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Sky } from '@react-three/drei';
 import * as THREE from 'three';
 import { ArenaCenterpiece } from '../3d/ArenaCenterpiece';
@@ -234,6 +234,51 @@ const CinematicCamera: React.FC<{ mouseX: number; mouseY: number }> = ({ mouseX,
   return null;
 };
 
+const CyberParticles3D: React.FC = () => {
+  const particles = React.useMemo(() => {
+    const items: Array<[number, number, number]> = [];
+
+    for (let i = 0; i < 120; i++) {
+      const radius = 12 + Math.random() * 18;
+      const angle = (i / 120) * Math.PI * 2;
+      const y = 1 + Math.random() * 7;
+      items.push([
+        Math.cos(angle) * radius,
+        y,
+        Math.sin(angle) * radius,
+      ]);
+    }
+
+    return items;
+  }, []);
+
+  return (
+    <group>
+      {particles.map((position, index) => (
+        <mesh key={index} position={position}>
+          <sphereGeometry args={[0.06, 10, 10]} />
+          <meshStandardMaterial
+            color={index % 2 === 0 ? '#00f0ff' : '#9d4edd'}
+            emissive={index % 2 === 0 ? '#00f0ff' : '#9d4edd'}
+            emissiveIntensity={0.9}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
+const ShadowMapFix: React.FC = () => {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = THREE.PCFShadowMap;
+  }, [gl]);
+
+  return null;
+};
+
 interface HomeArena3DProps {
   parallaxX?: number;
   parallaxY?: number;
@@ -252,12 +297,12 @@ export const HomeArena3D: React.FC<HomeArena3DProps> = ({ parallaxX = 0, paralla
       }}
     >
       <Canvas
-        shadows
         dpr={[1, 1.5]}
         gl={{ powerPreference: 'high-performance', antialias: true }}
         camera={{ position: [0, 45, 90], fov: 50 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
       >
+        <ShadowMapFix />
         <Sky sunPosition={[100, 40, 100]} inclination={0.6} azimuth={0.25} />
         <fog attach="fog" args={['#c8d6e5', 80, 250]} />
 

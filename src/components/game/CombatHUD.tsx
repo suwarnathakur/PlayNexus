@@ -51,7 +51,7 @@ interface CombatHUDProps {
   onBlockPress?: () => void;
   onDodgePress?: () => void;
   onSpecialPress?: () => void;
-  selectedStyle?: 'melee' | 'archery';
+  selectedStyle?: 'melee' | 'archery' | 'wrestling' | 'defense' | 'sword';
 }
 
 export const CombatHUD: React.FC<CombatHUDProps> = ({

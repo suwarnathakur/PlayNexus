@@ -15,7 +15,6 @@ import {
   Crosshair,
   Shield,
   Flame,
-  HelpCircle,
   Activity,
   CheckCircle2,
   AlertTriangle,
@@ -85,7 +84,7 @@ const FIGHTING_STYLES: FightingStyle[] = [
     archetype: 'TITAN GRAPPLER',
     difficulty: 5,
     difficultyLabel: 'EXPERT ★★★★★',
-    isPlayable: false,
+    isPlayable: true,
     accentColor: '#ff0055',
     icon: <Flame size={22} />,
     tagline: 'Heavy mechanical throws and ground suppression',
@@ -104,7 +103,7 @@ const FIGHTING_STYLES: FightingStyle[] = [
     archetype: 'CYBER BLADE',
     difficulty: 4,
     difficultyLabel: 'HARD ★★★★☆',
-    isPlayable: false,
+    isPlayable: true,
     accentColor: '#00ff9d',
     icon: <Swords size={22} />,
     tagline: 'High-frequency particle edge slices and directional parries',
@@ -123,7 +122,7 @@ const FIGHTING_STYLES: FightingStyle[] = [
     archetype: 'AEGIS FORTRESS',
     difficulty: 3,
     difficultyLabel: 'NORMAL ★★★☆☆',
-    isPlayable: false,
+    isPlayable: true,
     accentColor: '#fbbf24',
     icon: <Shield size={22} />,
     tagline: 'Energy barrier absorption and counter-blast release',
@@ -134,25 +133,6 @@ const FIGHTING_STYLES: FightingStyle[] = [
       speed: 60,
       defense: 99,
       adaptability: 85,
-    },
-  },
-  {
-    id: 'locked',
-    name: '??? LOCKED',
-    archetype: 'CLASSIFIED // REDACTED',
-    difficulty: '?',
-    difficultyLabel: 'UNKNOWN ?????',
-    isPlayable: false,
-    accentColor: '#64748b',
-    icon: <HelpCircle size={22} />,
-    tagline: 'Autonomous AI synthesis prototype',
-    description:
-      'A prototype fighting archetype generated dynamically by the PlayNexus neural engine. Requires 50 arena victories to unlock.',
-    stats: {
-      power: 100,
-      speed: 100,
-      defense: 100,
-      adaptability: 100,
     },
   },
 ];
@@ -178,8 +158,8 @@ export const CharacterSelect: React.FC = () => {
         playSound('click');
       }
       setSelectedStyleId(style.id);
-      if (style.id === 'melee' || style.id === 'archery') {
-        setStoreStyle(style.id);
+      if (['melee', 'archery', 'wrestling', 'defense', 'sword'].includes(style.id)) {
+        setStoreStyle(style.id as 'melee' | 'archery' | 'wrestling' | 'defense' | 'sword');
       }
       setLockedNotice(null);
     } else {
@@ -196,8 +176,8 @@ export const CharacterSelect: React.FC = () => {
       playSound('denied');
       return;
     }
-    if (selectedStyle.id === 'melee' || selectedStyle.id === 'archery') {
-      setStoreStyle(selectedStyle.id);
+    if (['melee', 'archery', 'wrestling', 'defense', 'sword'].includes(selectedStyle.id)) {
+      setStoreStyle(selectedStyle.id as 'melee' | 'archery' | 'wrestling' | 'defense' | 'sword');
     }
     playSound('granted');
     navigate('/pre-fight');
@@ -617,7 +597,7 @@ export const CharacterSelect: React.FC = () => {
               <PlayerPreview3D
                 glowColor={selectedStyle.accentColor}
                 isMelee={selectedStyle.id === 'melee'}
-                selectedStyle={selectedStyle.id as 'melee' | 'archery'}
+                selectedStyle={selectedStyle.id as 'melee' | 'archery' | 'wrestling' | 'defense' | 'sword'}
               />
             </div>
 

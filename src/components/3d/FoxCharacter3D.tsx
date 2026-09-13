@@ -16,6 +16,7 @@ export interface FoxCharacter3DProps {
   isMoving?: boolean;
   speedMultiplier?: number;
   glowColor?: string;
+  weapon?: 'melee' | 'sword';
 }
 
 interface Palette {
@@ -166,6 +167,7 @@ export const FoxCharacter3D: React.FC<FoxCharacter3DProps> = ({
   isHit = false,
   isDead = false,
   isMoving = false,
+  weapon = 'melee',
 }) => {
   const basePalette = PALETTES[variant] || PALETTES.fox;
   // Apply costume overrides only for the player fox (not falco/rival)
@@ -599,6 +601,27 @@ export const FoxCharacter3D: React.FC<FoxCharacter3DProps> = ({
           <boxGeometry args={[0.11, 0.06, 0.05]} />
           <meshStandardMaterial color="#64748b" roughness={0.2} metalness={0.9} />
         </mesh>
+
+        {weapon === 'sword' && (
+          <group position={[0.12, -0.6, 0.18]} rotation={[0.12, 0, -0.4]}>
+            <mesh castShadow position={[0, 0, 0]}>
+              <boxGeometry args={[0.08, 0.72, 0.08]} />
+              <meshStandardMaterial color="#e2e8f0" metalness={0.9} roughness={0.25} />
+            </mesh>
+            <mesh castShadow position={[0, 0.38, 0]}>
+              <boxGeometry args={[0.16, 0.12, 0.12]} />
+              <meshStandardMaterial color="#f8fafc" metalness={0.8} roughness={0.2} />
+            </mesh>
+            <mesh castShadow position={[0, -0.18, 0]}>
+              <boxGeometry args={[0.15, 0.12, 0.1]} />
+              <meshStandardMaterial color="#cbd5e1" metalness={0.75} roughness={0.25} />
+            </mesh>
+            <mesh castShadow position={[0.02, 0.52, 0]}>
+              <coneGeometry args={[0.08, 0.18, 6]} />
+              <meshStandardMaterial color="#fbbf24" emissive="#f59e0b" emissiveIntensity={0.5} />
+            </mesh>
+          </group>
+        )}
       </group>
 
       {/* ============================================================== */}

@@ -1,9 +1,5 @@
 import React from 'react';
 import {
-  Shield,
-  Target,
-  Dna,
-  Zap,
   CloudSun,
   Lock,
   Award,
@@ -32,116 +28,17 @@ export const PlayNexusArenaUI: React.FC = () => {
         
         {/* ================= TOP SECTION ================= */}
         <div className="grid grid-cols-12 gap-4 items-start">
-          
-          {/* Panel 1: Counter-Measures */}
-          <div className="col-span-3 bg-slate-950/70 border border-cyan-500/30 rounded-lg p-3 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
-            <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase tracking-wider mb-2 border-b border-cyan-500/20 pb-1">
-              <Shield className="w-4 h-4 text-cyan-400" /> Counter-Measures
-            </div>
-            <div className="space-y-1 text-xs font-mono text-slate-300">
-              <div className="flex justify-between items-center">
-                <span>Data-Streams Active</span>
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              </div>
-              <div className="flex justify-between items-center">
-                <span>False Streams Active</span>
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-              </div>
-              <div className="pt-2 flex justify-between text-[11px] text-slate-400">
-                <span>Storage (TB):</span>
-                <span className="text-cyan-300">124/256</span>
-              </div>
-              <div className="flex justify-between text-[11px] text-slate-400">
-                <span>Usage (Mbps):</span>
-                <span className="text-emerald-400">48.2</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Spacer */}
+          <div className="col-span-6 flex justify-end items-center gap-3 pr-4" />
           <div className="col-span-6 flex justify-end items-center gap-3 pr-4">
             <div className="flex items-center gap-2 bg-slate-950/60 border border-cyan-500/20 px-3 py-1 rounded-full text-xs font-mono text-cyan-300">
               <CloudSun className="w-3.5 h-3.5 text-amber-400" /> Weather API: 18:42:15 | NW 14km/h
-            </div>
-          </div>
-
-          {/* Panel 2: Threat Vector & Blue Core Active */}
-          <div className="col-span-3 space-y-2">
-            <div className="bg-slate-950/70 border border-cyan-500/30 rounded-lg p-3 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
-              <div className="flex items-center justify-between text-cyan-400 font-bold text-xs uppercase tracking-wider mb-1 border-b border-cyan-500/20 pb-1">
-                <span className="flex items-center gap-1.5"><Target className="w-3.5 h-3.5" /> Threat Vector</span>
-                <span className="text-[10px] text-cyan-300 font-mono">Total: 24.7</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1 text-[11px] font-mono text-center">
-                <div className="bg-slate-900/60 p-1 rounded border border-cyan-500/10">Start: 12.1</div>
-                <div className="bg-slate-900/60 p-1 rounded border border-cyan-500/10">Mid: 8.4</div>
-                <div className="bg-slate-900/60 p-1 rounded border border-cyan-500/10">End: 4.2</div>
-              </div>
-            </div>
-
-            <div className="bg-slate-950/70 border border-cyan-500/30 rounded-lg p-2 flex items-center justify-between text-xs font-mono text-cyan-300">
-              <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-cyan-400" /> Blue Core Active</span>
-              <span className="text-emerald-400 font-bold">Seq #7 [ACTIVE]</span>
             </div>
           </div>
         </div>
 
         {/* ================= MIDDLE SECTION ================= */}
         <div className="grid grid-cols-12 gap-4 items-center">
-          
-          {/* Panel 3: AI Stance Prediction & Tactical DNA */}
-          <div className="col-span-3 space-y-3">
-            {/* AI Stance Graph Card */}
-            <div className="bg-slate-950/75 border border-cyan-500/30 rounded-lg p-3 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
-              <div className="flex justify-between items-center text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">
-                <span>AI Stance Prediction</span>
-                <span className="text-[10px] text-emerald-400 font-mono">Aggression: 76%</span>
-              </div>
-              <div className="h-20 w-full relative flex items-end justify-between px-1 border-b border-l border-cyan-500/30">
-                {/* SVG Curve Graphic Representation */}
-                <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 50">
-                  <path d="M 0 40 Q 25 10 50 35 T 100 15" fill="none" stroke="#06b6d4" strokeWidth="2" />
-                  <path d="M 0 30 Q 35 45 65 5 T 100 25" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3,3" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Tactical DNA Card */}
-            <div className="bg-slate-950/75 border border-cyan-500/30 rounded-lg p-3 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
-              <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">
-                <Dna className="w-4 h-4 text-cyan-400" /> Tactical DNA
-              </div>
-              <div className="space-y-1.5 text-xs font-mono">
-                <div>
-                  <div className="flex justify-between text-[11px] text-slate-300">
-                    <span>LEFT DODGE</span>
-                    <span className="text-cyan-300">73%</span>
-                  </div>
-                  <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-cyan-500/20">
-                    <div className="bg-cyan-400 h-full w-[73%]" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[11px] text-slate-300">
-                    <span>RIGHT DODGE</span>
-                    <span className="text-cyan-300">12%</span>
-                  </div>
-                  <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-cyan-500/20">
-                    <div className="bg-amber-400 h-full w-[12%]" />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-[11px] text-slate-300">
-                    <span>BACKSTEP</span>
-                    <span className="text-cyan-300">15%</span>
-                  </div>
-                  <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-cyan-500/20">
-                    <div className="bg-emerald-400 h-full w-[15%]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div className="col-span-3" />
 
           {/* Center Column: Prominent CTA */}
           <div className="col-span-6 flex flex-col items-center justify-center pointer-events-auto">
