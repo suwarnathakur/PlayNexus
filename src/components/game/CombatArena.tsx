@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Sky } from '@react-three/drei';
 import * as THREE from 'three';
@@ -1616,17 +1616,46 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
     }, 450);
   };
 
+  // Restart Match Handler
+  const handleRestartMatch = useCallback(() => {
+    playSound('transition');
+    playSound('granted');
+    setPlayerHp(PLAYER_MAX_HP);
+    setEnemyHp(ENEMY_MAX_HP);
+    setComboCount(0);
+    setLastDamageEvent(null);
+    playerPosRef.current.set(-2.2, 0.22, 0);
+    enemyPosRef.current.set(2.5, 0.22, 0);
+    setPlayerCoordinates([-2.2, 0.22, 0]);
+    setIsPlayerHit(false);
+    setIsEnemyHit(false);
+    aiControllerRef.current.reset();
+    dodgeLockManagerRef.current.reset();
+    setIsPlayerAttacking(false);
+    setIsPlayerBlocking(false);
+    setIsPlayerDodging(false);
+
+    // Reset telemetry
+    telemetryCollectorRef.current.startMatch();
+    clearTelemetry();
+  }, [clearTelemetry, playSound]);
+
   // Groq Whisper & Web Speech API Voice Commands Integration (Attack, Block, Dodge, Special, Rematch)
-  const voiceCommands = useVoiceCommands({
-    onAttack: triggerPlayerAttack,
-    onBlock: () => {
-      triggerPlayerBlockStart();
-      setTimeout(() => setIsPlayerBlocking(false), 900);
-    },
-    onDodge: triggerPlayerDodge,
-    onSpecial: triggerPlayerSpecial,
-    onRestart: () => handleRestartMatch(),
-  });
+  const combatVoiceHandlers = useMemo(
+    () => ({
+      onAttack: triggerPlayerAttack,
+      onBlock: () => {
+        triggerPlayerBlockStart();
+        setTimeout(() => setIsPlayerBlocking(false), 900);
+      },
+      onDodge: triggerPlayerDodge,
+      onSpecial: triggerPlayerSpecial,
+      onRestart: () => handleRestartMatch(),
+    }),
+    [triggerPlayerAttack, triggerPlayerBlockStart, triggerPlayerDodge, triggerPlayerSpecial, handleRestartMatch]
+  );
+
+  const voiceCommands = useVoiceCommands(combatVoiceHandlers);
 
   // Listen to Global Voice Commands dispatched from Floating Mic
   useEffect(() => {
@@ -1702,30 +1731,6 @@ export const CombatArena: React.FC<CombatArenaProps> = ({ onExit, playerCodename
       playSound('denied');
     }
   }, [isVictory, isDefeat, playSound]);
-
-  // Restart Match Handler
-  const handleRestartMatch = () => {
-    playSound('transition');
-    playSound('granted');
-    setPlayerHp(PLAYER_MAX_HP);
-    setEnemyHp(ENEMY_MAX_HP);
-    setComboCount(0);
-    setLastDamageEvent(null);
-    playerPosRef.current.set(-2.2, 0.22, 0);
-    enemyPosRef.current.set(2.5, 0.22, 0);
-    setPlayerCoordinates([-2.2, 0.22, 0]);
-    setIsPlayerHit(false);
-    setIsEnemyHit(false);
-    aiControllerRef.current.reset();
-    dodgeLockManagerRef.current.reset();
-    setIsPlayerAttacking(false);
-    setIsPlayerBlocking(false);
-    setIsPlayerDodging(false);
-
-    // Reset telemetry
-    telemetryCollectorRef.current.startMatch();
-    clearTelemetry();
-  };
 
   const playerStateBadge = isPlayerDodging
     ? 'DODGING'

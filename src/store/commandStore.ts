@@ -135,34 +135,44 @@ export const useCommandStore = create<CommandState>((set, get) => ({
     }
 
     // 2. NAVIGATION COMMANDS
-    else if (/\b(arena|battle|fight|combat|start fight|play)\b/.test(text)) {
+    else if (/\b(arena|areana|battle|fight|combat|start fight|play)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_ARENA', 'navigation', 'Deploying to Combat Arena.', '/arena');
       navigate?.('/arena');
-    } else if (/\b(character|characters|fighter|fighters|select character|choose character|roster)\b/.test(text)) {
+    } else if (/\b(character|characters|fighter|fighters|select character|choose character|roster)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_CHARACTER_SELECT', 'navigation', 'Opening Operative Selection.', '/character-select');
       navigate?.('/character-select');
-    } else if (/\b(pre-fight|prefight|lobby|staging)\b/.test(text)) {
+    } else if (/\b(pre-fight|prefight|lobby|staging)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_PREFIGHT', 'navigation', 'Entering Pre-Fight Tactical Room.', '/pre-fight');
       navigate?.('/pre-fight');
-    } else if (/\b(leaderboard|rankings|ranking|scores|top players|ladder)\b/.test(text)) {
+    } else if (/\b(leaderboard|rankings|ranking|scores|top players|ladder)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_LEADERBOARD', 'navigation', 'Accessing Sector Leaderboard.', '/leaderboard');
       navigate?.('/leaderboard');
-    } else if (/\b(profile|account|stats|operative|xp|level)\b/.test(text)) {
+    } else if (/\b(profile|account|stats|operative|xp|level)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_PROFILE', 'navigation', 'Opening Operative Profile.', '/profile');
       navigate?.('/profile');
-    } else if (/\b(setting|settings|config|configuration|options)\b/.test(text)) {
+    } else if (/\b(setting|settings|config|configuration|options)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_SETTINGS', 'navigation', 'Opening System Settings.', '/settings');
       navigate?.('/settings');
-    } else if (/\b(home|menu|main menu|dashboard)\b/.test(text)) {
+    } else if (/\b(home|menu|main menu|dashboard)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_HOME', 'navigation', 'Returning to Command Dashboard.', '/');
       navigate?.('/');
-    } else if (/\b(login|sign in|authenticate)\b/.test(text)) {
+    } else if (/\b(login|sign in|authenticate)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_LOGIN', 'navigation', 'Accessing Operative Login.', '/login');
       navigate?.('/login');
-    } else if (/\b(register|sign up|new operative)\b/.test(text)) {
+    } else if (/\b(register|sign up|new operative)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_REGISTER', 'navigation', 'Opening Registration Protocol.', '/register');
       navigate?.('/register');
-    } else if (/\b(analysis|telemetry|metrics|dna)\b/.test(text)) {
+    } else if (/\b(analysis|telemetry|metrics|dna)\b/i.test(text)) {
+      set({ isTerminalOpen: false });
       execute('NAVIGATE_ANALYSIS', 'navigation', 'Analyzing Combat Telemetry.', '/analysis');
       navigate?.('/analysis');
     }
