@@ -10,7 +10,6 @@ import {
   Sparkles,
   Swords,
   Trophy,
-  Zap,
 } from 'lucide-react';
 import { GlowButton } from '../../components/common/GlowButton';
 import { Logo } from '../../components/common/Logo';
@@ -34,7 +33,7 @@ const dnaMetrics = [
   { label: 'RANGE', key: 'preferredRange' },
 ] as const;
 
-const formatDNAValue = (key: string, value: number | string) => {
+const formatDNAValue = (key: string, value: any) => {
   if (key === 'reactionTime') return `${Number(value).toFixed(2)}s`;
   if (key === 'preferredRange') return String(value).toUpperCase();
   if (typeof value === 'number') return `${Math.round(value * 100)}%`;

@@ -11,51 +11,12 @@ import type { MatchTelemetry } from '../game/telemetry/TelemetryTypes';
  */
 export const DEMO_MATCH_1_TELEMETRY: MatchTelemetry = {
   matchId: 'DEMO-MATCH-01-TELEMETRY',
-<<<<<<< Updated upstream
-  startTime: Date.now() - 40000,
-  endTime: Date.now() - 6000,
-  durationSeconds: 34,
-  outcome: 'VICTORY',
-  playerFinalHp: 68,
-  enemyFinalHp: 0,
-  events: [
-    { id: 'ev-1', action: 'attack', timestamp: 1200, combo: 1, distanceToEnemy: 1.8 },
-    { id: 'ev-2', action: 'hit', timestamp: 1400, damage: 16, combo: 1 },
-    { id: 'ev-3', action: 'dodge', direction: 'left', timestamp: 2800 },
-    { id: 'ev-4', action: 'attack', timestamp: 3900, combo: 1 },
-    { id: 'ev-5', action: 'hit', timestamp: 4100, damage: 16, combo: 1 },
-    { id: 'ev-6', action: 'attack', timestamp: 4600, combo: 2 },
-    { id: 'ev-7', action: 'hit', timestamp: 4800, damage: 16, combo: 2 },
-    { id: 'ev-8', action: 'attack', timestamp: 5300, combo: 3 },
-    { id: 'ev-9', action: 'hit', timestamp: 5500, damage: 28, combo: 3 },
-    { id: 'ev-10', action: 'dodge', direction: 'left', timestamp: 6900 },
-    { id: 'ev-11', action: 'dodge', direction: 'left', timestamp: 8400 },
-    { id: 'ev-12', action: 'dodge', direction: 'left', timestamp: 10200 },
-    { id: 'ev-13', action: 'dodge', direction: 'left', timestamp: 11900 },
-    { id: 'ev-14', action: 'attack', timestamp: 13200, combo: 1 },
-    { id: 'ev-15', action: 'hit', timestamp: 13400, damage: 16, combo: 1 },
-    { id: 'ev-16', action: 'attack', timestamp: 13900, combo: 2 },
-    { id: 'ev-17', action: 'hit', timestamp: 14100, damage: 16, combo: 2 },
-    { id: 'ev-18', action: 'attack', timestamp: 14600, combo: 3 },
-    { id: 'ev-19', action: 'hit', timestamp: 14800, damage: 28, combo: 3 },
-    { id: 'ev-20', action: 'dodge', direction: 'left', timestamp: 16200 },
-    { id: 'ev-21', action: 'dodge', direction: 'left', timestamp: 17800 },
-    { id: 'ev-22', action: 'dodge', direction: 'right', timestamp: 19500 },
-    { id: 'ev-23', action: 'dodge', direction: 'left', timestamp: 21100 },
-    { id: 'ev-24', action: 'dodge', direction: 'left', timestamp: 22800 },
-    { id: 'ev-25', action: 'dodge', direction: 'left', timestamp: 24400 },
-    { id: 'ev-26', action: 'dodge', direction: 'left', timestamp: 26000 },
-    { id: 'ev-27', action: 'dodge', direction: 'right', timestamp: 27500 },
-    { id: 'ev-28', action: 'dodge', direction: 'left', timestamp: 29100 },
-    { id: 'ev-29', action: 'dodge', direction: 'left', timestamp: 30800 },
-    { id: 'ev-30', action: 'dodge', direction: 'left', timestamp: 32400 },
-=======
   startTime: Date.now() - 34000,
   endTime: Date.now() - 1000,
   durationSeconds: 34,
   outcome: 'VICTORY',
-  playerFinalHp: 100,
-  enemyFinalHp: 40,
+  playerFinalHp: 68,
+  enemyFinalHp: 0,
   events: [
     { id: 'evt-01', action: 'attack', timestamp: 1200, intervalSinceLastAction: 0, combo: 1, distanceToEnemy: 1.8 },
     { id: 'evt-02', action: 'hit', timestamp: 1400, intervalSinceLastAction: 200, combo: 1, damage: 16 },
@@ -87,7 +48,6 @@ export const DEMO_MATCH_1_TELEMETRY: MatchTelemetry = {
     { id: 'evt-28', action: 'dodge', timestamp: 29100, intervalSinceLastAction: 1600, direction: 'left' },
     { id: 'evt-29', action: 'dodge', timestamp: 30800, intervalSinceLastAction: 1700, direction: 'left' },
     { id: 'evt-30', action: 'dodge', timestamp: 32400, intervalSinceLastAction: 1600, direction: 'left' },
->>>>>>> Stashed changes
   ],
   metrics: {
     totalAttacks: 22,
@@ -99,23 +59,14 @@ export const DEMO_MATCH_1_TELEMETRY: MatchTelemetry = {
     dodgeLeftCount: 15,
     dodgeRightCount: 3,
     dodgeOtherCount: 0,
-<<<<<<< Updated upstream
     dodgeLeftPercentage: 83.3,
     dodgeRightPercentage: 16.7,
-=======
-    dodgeLeftPercentage: 83,
-    dodgeRightPercentage: 17,
->>>>>>> Stashed changes
     dodgeOtherPercentage: 0,
     averageComboLength: 2.8,
     maxCombo: 3,
     totalDamageDealt: 100,
     totalDamageReceived: 32,
-<<<<<<< Updated upstream
     totalDistanceMoved: 45.2,
-=======
-    totalDistanceMoved: 24.6,
->>>>>>> Stashed changes
     durationSeconds: 34,
     aggression: 82,
     defense: 44,
@@ -128,35 +79,22 @@ export const DEMO_MATCH_1_TELEMETRY: MatchTelemetry = {
  * Deterministic Fighting DNA generated from Match 1 (Predictability = HIGH)
  */
 export const DEMO_FIGHTING_DNA: FightingDNAProfile = {
-<<<<<<< Updated upstream
   id: 'dna-demo-match-1',
   timestamp: Date.now(),
-  aggression: 0.82,
-  defense: 0.44,
-  mobility: 0.74,
-=======
-  id: 'DNA-DEMO-MATCH-01',
-  timestamp: Date.now(),
-  archetype: 'BERSERKER',
+  archetype: 'BALANCED_STRIKER',
   aggression: 0.82,
   defense: 0.44,
   mobility: 0.74,
   predictabilityIndex: 0.84,
->>>>>>> Stashed changes
   reactionTime: 0.21,
   preferredDodge: 'left',
   preferredRange: 'close',
   averageComboLength: 2.8,
-<<<<<<< Updated upstream
-  predictabilityIndex: 0.84, // High predictability trigger
-  topPatterns: ['DODGE_LEFT_BIAS', 'COMBO_3_COMMIT'],
-=======
   topPatterns: [
     'Heavy Left-Flank Evade Sequence (Dodge Left -> Strike)',
     'Triple Strike Rapid Combo (J -> J -> J)',
     'Hyper-Aggressive Forward Rushdown (Zero Neutral Footwork)',
   ],
->>>>>>> Stashed changes
   repeatedCombos: ['LIGHT-LIGHT-HEAVY'],
   strengths: [
     'Explosive offensive pressure and forward momentum',
@@ -168,25 +106,16 @@ export const DEMO_FIGHTING_DNA: FightingDNAProfile = {
     'Over-commits to complete 3-hit string even when opponent guards',
     'Vulnerable to flank counter-strikes on left recovery frames',
   ],
-<<<<<<< Updated upstream
-  archetype: 'BALANCED_STRIKER',
   totalAttacks: 22,
   accuracyPercentage: 77.3,
   dodgeLeftPercentage: 83.3,
   dodgeRightPercentage: 16.7,
-=======
-  totalAttacks: 22,
-  accuracyPercentage: 77,
-  dodgeLeftPercentage: 83,
-  dodgeRightPercentage: 17,
->>>>>>> Stashed changes
 };
 
 /**
  * Match 2 AI Adaptive Counter-Strategy targeting Left Dodge
  */
 export const DEMO_COUNTER_STRATEGY: CounterStrategy = {
-<<<<<<< Updated upstream
   id: 'strategy-demo-counter-left',
   name: 'COUNTER LEFT DODGE & SWEEP FLANK',
   tacticalDescription:
@@ -210,27 +139,6 @@ export const DEMO_COUNTER_STRATEGY: CounterStrategy = {
     'ANTI-COMBO ADAPTATION // AUTO-BLOCK & PARRY (LIGHT-LIGHT-HEAVY)',
     'RELENTLESS RUSHDOWN // SPRINT CLOSURE & BOUNDARY PIN',
   ],
-=======
-  id: 'COUNTER-LEFT-DODGE-FLANK',
-  name: 'COUNTER LEFT DODGE & SWEEP FLANK',
-  tacticalDescription:
-    'The AI analyzed your Match 1 telemetry: 83% of your evasive dodges were directed LEFT. The opponent will now anticipate your left slip, sweep the recovery lane, and parry the 3rd strike of your Light-Light-Heavy string.',
-  activeTactics: ['COUNTER_LEFT', 'PUNISH_COMBO', 'PRESSURE_RUSH'],
-  counterDodge: 'COUNTER_LEFT',
-  interceptDodgeBias: 'left',
-  defenseMode: 'HIGH_GUARD',
-  antiComboTactics: true,
-  targetComboPattern: 'LIGHT-LIGHT-HEAVY',
-  blockProbabilityOnPlayerAttack: 0.72,
-  counterAttackAfterBlockProbability: 0.64,
-  pressureMode: 'RELENTLESS_CHASE',
-  approachSpeedMultiplier: 1.25,
-  attackRangeMultiplier: 1.15,
-  dodgeLeftFrequency: 0.83,
-  comboPatternName: 'LIGHT-LIGHT-HEAVY',
-  predictabilityLevel: 'HIGH',
-  adaptationConfidence: 0.92,
->>>>>>> Stashed changes
 };
 
 /**
