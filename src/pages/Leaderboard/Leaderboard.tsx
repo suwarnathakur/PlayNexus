@@ -5,6 +5,7 @@ import { GlowButton } from '../../components/common/GlowButton';
 import { Logo } from '../../components/common/Logo';
 import { Scanline } from '../../components/effects/Scanline';
 import { useSound } from '../../hooks/useSound';
+import { API_BASE_URL } from '../../services/api';
 
 interface LeaderboardEntry {
   rank?: number;
@@ -81,7 +82,7 @@ export const Leaderboard: React.FC = () => {
     setIsLoading(true);
     setErrorNotice(null);
     try {
-      const res = await fetch('http://localhost:5000/api/leaderboard');
+      const res = await fetch(`${API_BASE_URL}/leaderboard`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data?.data?.leaderboard && Array.isArray(data.data.leaderboard)) {
